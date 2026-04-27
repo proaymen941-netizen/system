@@ -1,0 +1,202 @@
+@page "/account-info"
+@using BusinessSuite.Data
+@using Microsoft.EntityFrameworkCore
+@inject AuthService Auth
+@inject AuditService Audit
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>معلومات الحساب</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>معلومات الحساب</h1>
+        <p class="muted">عرض وتعديل بيانات حسابك الشخصية</p>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <div class="loading">جاري التحميل...</div>
+}
+else if (_user == null)
+{
+    <div class="alert-warning">لم يتم العثور على بيانات المستخدم.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <form @onsubmit="Save">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>اسم المستخدم</label>
+                        <input type="text" value="@_user.Username" readonly disabled />
+                    </div>
+                    <div class="form-group">
+                        <label>الاسم الكامل *</label>
+                        <input type="text" @bind="_editFullName" maxlength="60" />
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>البريد الإلكتروني</label>
+                        <input type="email" @bind="_editEmail" maxlength="120" />
+                    </div>
+                    <div class="form-group">
+                        <label>رقم الهاتف</label>
+                        <input type="tel" @bind="_editPhone" maxlength="20" />
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>العنوان</label>
+                        <input type="text" @bind="_editAddress" maxlength="250" />
+                    </div>
+                    <div class="form-group">
+                        <label>المسمى الوظيفي</label>
+                        <input type="text" @bind="_editPosition" maxlength="80" />
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>القسم</label>
+                        <input type="text" @bind="_editDepartment" maxlength="80" />
+                    </div>
+                    <div class="form-group">
+                        <label>تاريخ الميلاد</label>
+                        <input type="date" @bind="_editDateOfBirth" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور الجديدة (اتركها فارغة للاحتفاظ بالحالية)</label>
+                    <input type="password" @bind="_newPassword" maxlength="64" />
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" disabled="@_saving">
+                        @_saveText
+                    </button>
+                    <button type="button" class="btn-secondary" @onclick="Reset" disabled="@_saving">إعادة تعيين</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Auth.HasRole(UserRole.Admin) && _user?.Id > 0)
+    {
+        <div class="card" style="margin-top: 20px;">
+            <div class="panel-header"><h3>روابط سريعة</h3></div>
+            <p class="muted">إدارة صلاحيات المستخدمين</p>
+            <a class="btn-secondary" href="/users">إدارة جميع المستخدمين</a>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="@_messageClass">@_message</div>
+    }
+}
+
+@code {
+    private AppUser? _user;
+    private bool _loading = true;
+    private bool _saving = false;
+    private string _saveText = "حفظ التغييرات";
+    private string _message = "";
+    private string _messageClass = "";
+
+    private string _editFullName = "";
+    private string _editEmail = "";
+    private string _editPhone = "";
+    private string _editAddress = "";
+    private string _editPosition = "";
+    private string _editDepartment = "";
+    private DateTime? _editDateOfBirth;
+    private string _newPassword = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUser();
+    }
+
+    private async Task LoadUser()
+    {
+        _loading = true;
+        if (Auth.CurrentUser != null)
+        {
+            await using var db = DbFactory.CreateDbContext();
+            _user = await db.Users.FirstOrDefaultAsync(u => u.Id == Auth.CurrentUser.Id);
+            if (_user != null)
+            {
+                Reset();
+            }
+        }
+        _loading = false;
+    }
+
+    private void Reset()
+    {
+        if (_user == null) return;
+        _editFullName = _user.FullName;
+        _editEmail = _user.Email ?? "";
+        _editPhone = _user.Phone ?? "";
+        _editAddress = _user.Address ?? "";
+        _editPosition = _user.Position ?? "";
+        _editDepartment = _user.Department ?? "";
+        _editDateOfBirth = _user.DateOfBirth;
+        _newPassword = "";
+        _message = "";
+    }
+
+    private async Task Save()
+    {
+        if (_user == null) return;
+        _saving = true;
+        _saveText = "جاري الحفظ...";
+        _message = "";
+
+        try
+        {
+            await using var db = DbFactory.CreateDbContext();
+            var existing = await db.Users.FindAsync(_user.Id);
+            if (existing == null)
+            {
+                _message = "خطأ: لم يتم العثور على المستخدم";
+                _messageClass = "alert-error";
+                return;
+            }
+
+            existing.FullName = _editFullName;
+            existing.Email = _editEmail;
+            existing.Phone = _editPhone;
+            existing.Address = _editAddress;
+            existing.Position = _editPosition;
+            existing.Department = _editDepartment;
+            existing.DateOfBirth = _editDateOfBirth;
+
+            db.Users.Update(existing);
+            await db.SaveChangesAsync();
+
+            if (!string.IsNullOrEmpty(_newPassword))
+            {
+                await Auth.SaveUserAsync(existing, _newPassword);
+            }
+
+            await Audit.LogAsync("تعديل معلومات الحساب", "النظام", existing.Username);
+
+            _message = "✅ تم حفظ التغييرات بنجاح";
+            _messageClass = "success-banner";
+            _user = existing;
+            Reset();
+        }
+        catch (Exception ex)
+        {
+            _message = $"❌ خطأ أثناء الحفظ: {ex.Message}";
+            _messageClass = "alert-error";
+        }
+        finally
+        {
+            _saving = false;
+            _saveText = "حفظ التغييرات";
+        }
+    }
+}

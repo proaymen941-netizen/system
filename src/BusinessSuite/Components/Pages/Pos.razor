@@ -1,105 +1,191 @@
 @page "/pos"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject InventoryService InvSvc
 @inject PosService PosSvc
 @inject CustomerService CustSvc
 @inject CompanySettingsService SettingsSvc
+@inject CashierShiftService ShiftSvc
 @inject AuditService Audit
 @inject NavigationManager Nav
 @inject IJSRuntime Js
 
-<PageTitle>نقطة البيع</PageTitle>
+<PageTitle>الكاشير</PageTitle>
 
-<div class="page">
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">نقطة البيع (POS)</h1>
-            <p class="page-subtitle">إصدار فواتير المبيعات بشكل سريع — اضغط أو امسح الباركود</p>
+@if (_showShiftModal)
+{
+    <div class="modal-overlay">
+        <div class="modal" style="max-width:420px">
+            <div class="modal-header">
+                <h3>@(_activeShift == null ? "فتح وردية جديدة" : "إغلاق الوردية")</h3>
+            </div>
+            <div class="modal-body">
+                @if (_activeShift == null)
+                {
+                    <label>رصيد الصندوق الافتتاحي (@_currency)</label>
+                    <input class="input" type="number" step="0.01" @bind="_openingCash" />
+                }
+                else
+                {
+                    <div class="shift-summary">
+                        <div class="shift-row"><span>الكاشير</span><strong>@_activeShift.CashierName</strong></div>
+                        <div class="shift-row"><span>فُتحت</span><strong>@_activeShift.OpenedAt.ToString("hh:mm tt yyyy/MM/dd")</strong></div>
+                    </div>
+                    <label style="margin-top:1rem">رصيد الصندوق الختامي (@_currency)</label>
+                    <input class="input" type="number" step="0.01" @bind="_closingCash" />
+                    <label style="margin-top:.5rem">ملاحظات</label>
+                    <textarea class="input" rows="2" @bind="_shiftNotes" placeholder="اختياري..."></textarea>
+                }
+            </div>
+            <div class="modal-actions">
+                <button class="secondary-btn" @onclick="() => _showShiftModal = false">إلغاء</button>
+                <button class="primary-btn" @onclick="HandleShiftAction">
+                    @(_activeShift == null ? "فتح الوردية" : "إغلاق الوردية")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="pos-fullscreen">
+    <div class="pos-topbar">
+        <div class="pos-topbar-left">
+            <span class="pos-title">🛒 نقطة البيع</span>
+            @if (_activeShift != null)
+            {
+                <span class="shift-badge open">📋 وردية مفتوحة — @_activeShift.CashierName</span>
+            }
+            else
+            {
+                <span class="shift-badge closed">⚠️ لا توجد وردية</span>
+            }
+        </div>
+        <div class="pos-topbar-right">
+            <span class="pos-time">@_now.ToString("hh:mm tt")</span>
+            <span class="pos-date">@_now.ToString("yyyy/MM/dd")</span>
+            @if (_activeShift != null)
+            {
+                <button class="shift-btn close-shift" @onclick="() => _showShiftModal = true">إغلاق الوردية</button>
+            }
+            else
+            {
+                <button class="shift-btn open-shift" @onclick="() => _showShiftModal = true">فتح وردية</button>
+            }
         </div>
     </div>
 
-    <div class="pos-shell">
-        <div class="pos-products panel">
-            <div class="panel-header">
-                <h3>المنتجات المتاحة</h3>
-                <div style="display:flex;gap:8px">
-                    <input id="barcode-input" class="input-search" placeholder="📱 امسح الباركود (SKU)..." @bind="_barcode" @bind:event="oninput" @onkeyup="OnBarcodeKey" />
-                    <input class="input-search" placeholder="بحث..." @bind="_search" @bind:event="oninput" />
-                </div>
+    <div class="pos-body">
+        <div class="pos-left">
+            <div class="pos-search-bar">
+                <input class="pos-search-input" placeholder="🔍 بحث عن منتج..." @bind="_search" @bind:event="oninput" />
+                <input class="pos-barcode-input" id="barcode-input" placeholder="📱 باركود..." @bind="_barcode" @bind:event="oninput" @onkeyup="OnBarcodeKey" />
             </div>
-            <div class="pos-grid">
+
+            <div class="pos-categories">
+                <button class="cat-btn @(_category == "" ? "active" : "")" @onclick='() => _category = ""'>الكل</button>
+                @foreach (var cat in _categories)
+                {
+                    <button class="cat-btn @(_category == cat ? "active" : "")" @onclick="() => _category = cat">@cat</button>
+                }
+            </div>
+
+            <div class="pos-product-grid">
+                @{ int num = 1; }
                 @foreach (var p in FilteredProducts)
                 {
-                    <button class="product-card" @onclick="() => AddItem(p)" disabled="@(p.Quantity <= 0)">
-                        <div class="product-emoji">@p.ImageEmoji</div>
-                        <div class="product-name">@p.Name</div>
-                        <div class="product-price">@p.Price.ToString("N2") @_currency</div>
-                        <div class="product-meta">المخزون: @p.Quantity</div>
+                    var idx = num++;
+                    <button class="pos-product-btn @(p.Quantity <= 0 ? "out-of-stock" : "")"
+                            @onclick="() => AddItem(p)"
+                            disabled="@(p.Quantity <= 0)">
+                        <div class="ppb-code">@p.Sku</div>
+                        <div class="ppb-name">@p.Name</div>
+                        <div class="ppb-price">@p.Price.ToString("N0") @_currency</div>
+                        @if (p.Quantity <= 0) { <div class="ppb-out">نفذ</div> }
                     </button>
                 }
             </div>
         </div>
 
-        <div class="pos-cart panel">
-            <div class="panel-header">
-                <h3>السلة</h3>
-                <span class="chip chip-soft">@_cart.Count عنصر</span>
+        <div class="pos-right">
+            <div class="pos-order-types">
+                @foreach (var ot in _orderTypes)
+                {
+                    <button class="order-type-btn @(_orderType == ot ? "active" : "")" @onclick="() => _orderType = ot">@ot</button>
+                }
             </div>
 
-            <div style="padding:8px 12px">
-                <label class="muted" style="display:block;font-size:.85rem;margin-bottom:4px">العميل</label>
-                <select class="input" @bind="_customerId">
-                    @foreach (var c in _customers) { <option value="@c.Id">@c.Name</option> }
-                </select>
+            <div class="pos-cart-header">
+                <span>الطلب #@_todayOrderPreview</span>
+                <span class="muted" style="font-size:.8rem">@_cart.Count صنف</span>
+                @if (_cart.Any())
+                {
+                    <button class="clear-cart-btn" @onclick="ClearCart" title="مسح الطلب">✕ مسح</button>
+                }
             </div>
 
-            <div class="cart-items">
+            <div class="pos-cart-items">
                 @if (!_cart.Any())
                 {
-                    <div class="empty-state">السلة فارغة — اختر منتجاً للبدء</div>
+                    <div class="pos-empty-cart">
+                        <div style="font-size:2.5rem">🛍️</div>
+                        <div>اختر منتجاً للبدء</div>
+                    </div>
                 }
                 @foreach (var item in _cart)
                 {
-                    <div class="cart-row">
-                        <div class="cart-info">
-                            <div class="cart-name">@item.ProductName</div>
-                            <div class="cart-price">@item.UnitPrice.ToString("N2") @_currency</div>
+                    <div class="pos-cart-row">
+                        <div class="pcr-info">
+                            <div class="pcr-name">@item.ProductName</div>
+                            <div class="pcr-unit">@item.UnitPrice.ToString("N0") @_currency</div>
                         </div>
-                        <div class="qty-controls">
+                        <div class="pcr-qty">
                             <button @onclick="() => ChangeQty(item, -1)">−</button>
                             <span>@item.Quantity</span>
                             <button @onclick="() => ChangeQty(item, +1)">+</button>
                         </div>
-                        <div class="cart-total">@item.LineTotal.ToString("N2")</div>
+                        <div class="pcr-total">@item.LineTotal.ToString("N0")</div>
                     </div>
                 }
             </div>
 
-            <div class="cart-summary">
-                <div class="row"><span>المجموع</span><span>@Subtotal.ToString("N2") @_currency</span></div>
-                <div class="row"><span>الضريبة (@_taxRate%)</span><span>@Tax.ToString("N2") @_currency</span></div>
-                <div class="row total"><span>الإجمالي</span><span>@Total.ToString("N2") @_currency</span></div>
+            <div class="pos-totals">
+                <div class="pt-row"><span>المجموع</span><span>@Subtotal.ToString("N2") @_currency</span></div>
+                <div class="pt-row"><span>الضريبة @_taxRate%</span><span>@Tax.ToString("N2") @_currency</span></div>
+                <div class="pt-row grand"><span>الإجمالي</span><span>@Total.ToString("N2") @_currency</span></div>
             </div>
 
-            <div class="payment-row">
-                <button class="pay-btn pay-cash @(_payment == "نقدي" ? "active" : "")" @onclick='() => _payment = "نقدي"'>نقدي</button>
-                <button class="pay-btn pay-card @(_payment == "بطاقة" ? "active" : "")" @onclick='() => _payment = "بطاقة"'>بطاقة</button>
-                <button class="pay-btn pay-other @(_payment == "محفظة" ? "active" : "")" @onclick='() => _payment = "محفظة"'>محفظة</button>
-                <button class="pay-btn pay-other @(_paymentStatus == InvoicePaymentStatus.Unpaid ? "active" : "")" @onclick='() => _paymentStatus = _paymentStatus == InvoicePaymentStatus.Unpaid ? InvoicePaymentStatus.Paid : InvoicePaymentStatus.Unpaid'>آجل</button>
+            <div class="pos-payment-btns">
+                @foreach (var pm in new[] { "نقدي", "بطاقة", "محفظة" })
+                {
+                    <button class="pm-btn @(_payment == pm ? "active-pm" : "")" @onclick="() => _payment = pm">@pm</button>
+                }
+                <button class="pm-btn pm-deferred @(_paymentStatus == InvoicePaymentStatus.Unpaid ? "active-pm" : "")"
+                        @onclick='() => _paymentStatus = _paymentStatus == InvoicePaymentStatus.Unpaid ? InvoicePaymentStatus.Paid : InvoicePaymentStatus.Unpaid'>
+                    آجل
+                </button>
             </div>
 
-            @if (!string.IsNullOrEmpty(_error)) { <div class="error-banner">@_error</div> }
+            <div style="padding:0 0.75rem">
+                <label class="muted" style="font-size:.8rem">العميل</label>
+                <select class="input" @bind="_customerId" style="margin-top:2px">
+                    @foreach (var c in _customers) { <option value="@c.Id">@c.Name</option> }
+                </select>
+            </div>
 
-            <button class="checkout-btn" @onclick="Checkout" disabled="@(!_cart.Any())">إتمام البيع</button>
+            @if (!string.IsNullOrEmpty(_error)) { <div class="error-banner" style="margin:.5rem .75rem">@_error</div> }
+
+            <button class="pos-checkout-btn" @onclick="Checkout" disabled="@(!_cart.Any())">
+                ✅ إتمام البيع — @Total.ToString("N2") @_currency
+            </button>
 
             @if (!string.IsNullOrEmpty(_lastInvoice))
             {
-                <div class="success-banner">
-                    ✅ تم حفظ الفاتورة @_lastInvoice بنجاح
-                    @if (_lastInvoiceId > 0)
-                    {
-                        <a class="btn-link" href="@($"/print/sale/{_lastInvoiceId}")" target="_blank">🖨️ طباعة</a>
-                    }
+                <div class="pos-success-row">
+                    <span>✅ فاتورة @_lastInvoice</span>
+                    <div style="display:flex;gap:.5rem">
+                        <a href="/print/sale/@_lastInvoiceId" target="_blank" class="print-btn">🖨️ إيصال العميل</a>
+                        <a href="/print/kitchen/@_lastInvoiceId" target="_blank" class="print-btn kitchen">📋 قصاصة المطبخ</a>
+                    </div>
                 </div>
             }
         </div>
@@ -120,22 +206,54 @@
     private string _currency = "ر.س";
     private decimal _taxRate = 15m;
     private string _error = "";
+    private string _category = "";
+    private List<string> _categories = new();
+    private string _orderType = "محلي";
+    private List<string> _orderTypes = new() { "محلي", "آمر صرف", "توصيل" };
+    private CashierShift? _activeShift;
+    private bool _showShiftModal;
+    private decimal _openingCash;
+    private decimal _closingCash;
+    private string _shiftNotes = "";
+    private int _todayOrderPreview = 1;
+    private DateTime _now = DateTime.Now;
+    private System.Threading.Timer? _timer;
 
     protected override async Task OnInitializedAsync()
     {
         var s = await SettingsSvc.GetAsync();
         _currency = s.Currency;
         _taxRate = s.TaxRate;
+        if (!string.IsNullOrWhiteSpace(s.OrderTypeLocal)) _orderTypes[0] = s.OrderTypeLocal;
+        if (!string.IsNullOrWhiteSpace(s.OrderTypeTakeaway)) _orderTypes[1] = s.OrderTypeTakeaway;
+        if (!string.IsNullOrWhiteSpace(s.OrderTypeDelivery)) _orderTypes[2] = s.OrderTypeDelivery;
+        _orderType = _orderTypes[0];
+
         _customers = await CustSvc.GetAsync();
         _customerId = _customers.FirstOrDefault()?.Id ?? 0;
+        _activeShift = await ShiftSvc.GetActiveShiftAsync();
         await Refresh();
+        await UpdateOrderPreview();
+
+        _timer = new System.Threading.Timer(_ => InvokeAsync(() => { _now = DateTime.Now; StateHasChanged(); }), null, 0, 1000);
     }
 
-    private async Task Refresh() => _products = await InvSvc.GetProductsAsync();
+    private async Task Refresh()
+    {
+        _products = await InvSvc.GetProductsAsync();
+        _categories = _products.Select(p => p.Category).Distinct().Where(c => !string.IsNullOrEmpty(c)).OrderBy(c => c).ToList();
+    }
+
+    private async Task UpdateOrderPreview()
+    {
+        var invoices = await PosSvc.GetRecentSalesAsync(1000, DateTime.Today, null);
+        _todayOrderPreview = invoices.Count + 1;
+    }
 
     private IEnumerable<Product> FilteredProducts =>
-        string.IsNullOrWhiteSpace(_search) ? _products :
-        _products.Where(p => p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) || p.Sku.Contains(_search, StringComparison.OrdinalIgnoreCase));
+        _products.Where(p =>
+            (string.IsNullOrWhiteSpace(_category) || p.Category == _category) &&
+            (string.IsNullOrWhiteSpace(_search) || p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) || p.Sku.Contains(_search, StringComparison.OrdinalIgnoreCase)));
 
     private async Task OnBarcodeKey(KeyboardEventArgs e)
     {
@@ -152,15 +270,8 @@
     {
         _error = "";
         var existing = _cart.FirstOrDefault(c => c.ProductId == p.Id);
-        if (existing != null)
-        {
-            existing.Quantity++;
-            existing.LineTotal = existing.Quantity * existing.UnitPrice;
-        }
-        else
-        {
-            _cart.Add(new SaleInvoiceItem { ProductId = p.Id, ProductName = p.Name, UnitPrice = p.Price, Quantity = 1, LineTotal = p.Price });
-        }
+        if (existing != null) { existing.Quantity++; existing.LineTotal = existing.Quantity * existing.UnitPrice; }
+        else _cart.Add(new SaleInvoiceItem { ProductId = p.Id, ProductName = p.Name, UnitPrice = p.Price, Quantity = 1, LineTotal = p.Price });
     }
 
     private void ChangeQty(SaleInvoiceItem item, int delta)
@@ -170,6 +281,13 @@
         else item.LineTotal = item.Quantity * item.UnitPrice;
     }
 
+    private void ClearCart()
+    {
+        _cart.Clear();
+        _error = "";
+        _lastInvoice = "";
+    }
+
     private decimal Subtotal => _cart.Sum(i => i.LineTotal);
     private decimal Tax => Math.Round(Subtotal * (_taxRate / 100m), 2);
     private decimal Total => Subtotal + Tax;
@@ -177,6 +295,7 @@
     private async Task Checkout()
     {
         if (!_cart.Any()) return;
+        _error = "";
         var customer = _customers.FirstOrDefault(c => c.Id == _customerId);
         var inv = new SaleInvoice
         {
@@ -184,6 +303,8 @@
             CustomerName = customer?.Name ?? "زبون نقدي",
             CustomerId = customer?.Id,
             PaymentStatus = _paymentStatus,
+            OrderType = _orderType,
+            ShiftId = _activeShift?.Id,
             Items = _cart.Select(c => new SaleInvoiceItem
             {
                 ProductId = c.ProductId,
@@ -198,11 +319,32 @@
             await PosSvc.CompleteSaleAsync(inv);
             _lastInvoice = inv.InvoiceNumber;
             _lastInvoiceId = inv.Id;
-            await Audit.LogAsync("بيع", "نقطة البيع", $"فاتورة {inv.InvoiceNumber} بقيمة {inv.Total:N2}");
+            await Audit.LogAsync("بيع", "نقطة البيع", $"فاتورة {inv.InvoiceNumber} بقيمة {inv.Total:N2} — {_orderType}");
             _cart.Clear();
             _paymentStatus = InvoicePaymentStatus.Paid;
             await Refresh();
+            await UpdateOrderPreview();
+            await Js.InvokeVoidAsync("eval", $"window.open('/print/sale/{inv.Id}','_blank')");
         }
         catch (AuthorizationException ex) { _error = ex.Message; }
     }
+
+    private async Task HandleShiftAction()
+    {
+        if (_activeShift == null)
+        {
+            _activeShift = await ShiftSvc.OpenShiftAsync(_openingCash);
+            _openingCash = 0;
+        }
+        else
+        {
+            await ShiftSvc.CloseShiftAsync(_activeShift.Id, _closingCash, _shiftNotes);
+            _activeShift = null;
+            _closingCash = 0;
+            _shiftNotes = "";
+        }
+        _showShiftModal = false;
+    }
+
+    public void Dispose() => _timer?.Dispose();
 }

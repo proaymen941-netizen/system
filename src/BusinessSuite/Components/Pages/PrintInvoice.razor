@@ -8,74 +8,150 @@
 
 @if (_invoice == null)
 {
-    <p>جارٍ التحميل...</p>
+    <p style="text-align:center;padding:2rem">جارٍ التحميل...</p>
 }
 else
 {
-    <div class="invoice-page">
-        <div class="invoice-toolbar no-print">
-            <button class="btn-primary" onclick="window.print()">🖨️ طباعة</button>
-            <a class="btn-secondary" href="/sales">عودة للمبيعات</a>
-            @if (_invoice.IsCancelled)
-            {
-                <span class="tag tag-danger" style="margin-inline-start:auto">⚠️ هذه الفاتورة ملغاة</span>
-            }
-        </div>
+    <div class="thermal-toolbar no-print">
+        <button onclick="window.print()">🖨️ طباعة</button>
+        <a href="/sales">↩ المبيعات</a>
+        @if (_invoice.IsCancelled)
+        {
+            <span style="color:red;font-weight:700">⚠️ هذه الفاتورة ملغاة</span>
+        }
+    </div>
 
-        <div class="invoice-paper @(_invoice.IsCancelled ? "cancelled-stamp" : "")">
-            <div class="invoice-head">
-                <div>
-                    <div style="font-size:2.5rem">@_settings.LogoEmoji</div>
-                    <h2 style="margin:6px 0">@_settings.Name</h2>
-                    <div class="muted">@_settings.Address</div>
-                    <div class="muted" dir="ltr">@_settings.Phone</div>
-                    <div class="muted">الرقم الضريبي: @_settings.TaxNumber</div>
-                </div>
-                <div class="invoice-qr">
-                    <img src="@_qrData" alt="QR" />
-                    <small>رمز التحقق</small>
-                </div>
+    <div class="thermal-wrap">
+        <div class="thermal-receipt @(_invoice.IsCancelled ? "cancelled-stamp" : "")">
+
+            <div class="tr-header">
+                <div class="tr-logo">@_settings.LogoEmoji</div>
+                <div class="tr-company">@_settings.Name</div>
+                @if (!string.IsNullOrWhiteSpace(_settings.ReceiptHeader))
+                {
+                    <div class="tr-tagline">@_settings.ReceiptHeader</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_settings.Address))
+                {
+                    <div class="tr-small">@_settings.Address</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_settings.Phone))
+                {
+                    <div class="tr-small" dir="ltr">@_settings.Phone</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_settings.TaxNumber))
+                {
+                    <div class="tr-small">الرقم الضريبي: @_settings.TaxNumber</div>
+                }
             </div>
 
-            <hr />
+            <div class="tr-divider">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
 
-            <div class="invoice-meta">
-                <div><strong>فاتورة بيع</strong></div>
-                <div>رقم الفاتورة: <strong>@_invoice.InvoiceNumber</strong></div>
-                <div>التاريخ: @_invoice.Date.ToString("yyyy-MM-dd HH:mm")</div>
-                <div>العميل: @(_invoice.CustomerName)</div>
-                <div>طريقة الدفع: @_invoice.PaymentMethod</div>
-                <div>حالة الدفع: @PaymentLabel(_invoice.PaymentStatus)</div>
+            <div class="tr-meta">
+                <div class="tr-meta-row">
+                    <span>رقم الطلب</span>
+                    <strong>#@_invoice.OrderNumber</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>رقم الفاتورة</span>
+                    <strong>@_invoice.InvoiceNumber</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>التاريخ</span>
+                    <strong>@_invoice.Date.ToString("yyyy/MM/dd")</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>الوقت</span>
+                    <strong>@_invoice.Date.ToString("hh:mm tt")</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>نوع الطلب</span>
+                    <strong class="tr-order-type">@_invoice.OrderType</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>الكاشير</span>
+                    <strong>@(string.IsNullOrWhiteSpace(_invoice.CashierName) ? "—" : _invoice.CashierName)</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>العميل</span>
+                    <strong>@_invoice.CustomerName</strong>
+                </div>
+                <div class="tr-meta-row">
+                    <span>طريقة الدفع</span>
+                    <strong>@_invoice.PaymentMethod</strong>
+                </div>
+                @if (_invoice.PaymentStatus == InvoicePaymentStatus.Unpaid)
+                {
+                    <div class="tr-meta-row" style="color:red">
+                        <span>حالة الدفع</span>
+                        <strong>آجل ⚠️</strong>
+                    </div>
+                }
             </div>
 
-            <table class="invoice-items">
+            <div class="tr-divider">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+
+            <table class="tr-items">
                 <thead>
-                    <tr><th>#</th><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr>
+                    <tr>
+                        <th class="tr-item-name">الصنف</th>
+                        <th class="tr-item-qty">كمية</th>
+                        <th class="tr-item-price">سعر</th>
+                        <th class="tr-item-total">مجموع</th>
+                    </tr>
                 </thead>
                 <tbody>
-                    @{ int i = 1; }
                     @foreach (var it in _invoice.Items)
                     {
                         <tr>
-                            <td>@(i++)</td>
-                            <td>@it.ProductName</td>
-                            <td>@it.Quantity</td>
-                            <td>@it.UnitPrice.ToString("N2")</td>
-                            <td>@((it.Quantity * it.UnitPrice).ToString("N2"))</td>
+                            <td class="tr-item-name">@it.ProductName</td>
+                            <td class="tr-item-qty">@it.Quantity</td>
+                            <td class="tr-item-price">@it.UnitPrice.ToString("N2")</td>
+                            <td class="tr-item-total">@it.LineTotal.ToString("N2")</td>
                         </tr>
                     }
                 </tbody>
             </table>
 
-            <div class="invoice-totals">
-                <div><span>المجموع الفرعي:</span><strong>@_invoice.Subtotal.ToString("N2") @_settings.Currency</strong></div>
-                <div><span>الضريبة (@_settings.TaxRate%):</span><strong>@_invoice.Tax.ToString("N2") @_settings.Currency</strong></div>
-                <div class="grand"><span>الإجمالي:</span><strong>@_invoice.Total.ToString("N2") @_settings.Currency</strong></div>
+            <div class="tr-divider">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+
+            <div class="tr-totals">
+                <div class="tr-total-row">
+                    <span>المجموع الفرعي</span>
+                    <span>@_invoice.Subtotal.ToString("N2") @_settings.Currency</span>
+                </div>
+                @if (_settings.ShowTaxOnReceipt)
+                {
+                    <div class="tr-total-row">
+                        <span>ضريبة (@_settings.TaxRate%)</span>
+                        <span>@_invoice.Tax.ToString("N2") @_settings.Currency</span>
+                    </div>
+                }
+                <div class="tr-total-row grand">
+                    <span>الإجمالي</span>
+                    <span>@_invoice.Total.ToString("N2") @_settings.Currency</span>
+                </div>
             </div>
 
-            <div class="invoice-footer">
-                <p>شكراً لتعاملكم معنا — @_settings.Name</p>
+            @if (_settings.ShowQrOnReceipt && !string.IsNullOrEmpty(_qrData))
+            {
+                <div class="tr-divider">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+                <div class="tr-qr">
+                    <img src="@_qrData" alt="QR" width="90" height="90" />
+                    <div class="tr-small">رمز التحقق الضريبي</div>
+                </div>
+            }
+
+            <div class="tr-divider">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+
+            <div class="tr-footer">
+                @if (!string.IsNullOrWhiteSpace(_settings.ReceiptFooter))
+                {
+                    <div>@_settings.ReceiptFooter</div>
+                }
+                <div class="tr-small" style="margin-top:.3rem">@_settings.Name — @_invoice.Date.ToString("yyyy")</div>
             </div>
+
         </div>
     </div>
 }
@@ -92,19 +168,10 @@ else
         await using var db = Db.CreateDbContext();
         _invoice = await db.SaleInvoices.Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == Id);
 
-        if (_invoice != null)
+        if (_invoice != null && _settings.ShowQrOnReceipt)
         {
             var qrText = $"INV:{_invoice.InvoiceNumber}|DATE:{_invoice.Date:yyyy-MM-dd}|TOTAL:{_invoice.Total:N2}|VAT:{_settings.TaxNumber}";
-            _qrData = Qr.GenerateBase64Png(qrText, 6);
+            _qrData = Qr.GenerateBase64Png(qrText, 5);
         }
     }
-
-    private string PaymentLabel(InvoicePaymentStatus s) => s switch
-    {
-        InvoicePaymentStatus.Paid => "مدفوعة",
-        InvoicePaymentStatus.Unpaid => "غير مدفوعة",
-        InvoicePaymentStatus.PartiallyPaid => "مدفوعة جزئياً",
-        InvoicePaymentStatus.Refunded => "مسترجعة",
-        _ => s.ToString(),
-    };
 }

@@ -10,7 +10,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">إعدادات الشركة</h1>
-            <p class="page-subtitle">المعلومات الأساسية، العملة، نسبة الضريبة</p>
+            <p class="page-subtitle">المعلومات الأساسية، العملة، الضريبة، الإيصالات</p>
         </div>
     </div>
 
@@ -26,7 +26,7 @@
         <div class="panel">
             <div class="panel-header"><h3>المعلومات الأساسية</h3></div>
             <EditForm Model="_settings" OnValidSubmit="Save">
-                <div class="form-grid">
+                <div class="form-grid" style="padding:1rem">
                     <label>اسم الشركة<input class="input" @bind="_settings.Name" required /></label>
                     <label>الرمز/الشعار (إيموجي)<input class="input" @bind="_settings.LogoEmoji" /></label>
                     <label>الرقم الضريبي<input class="input" @bind="_settings.TaxNumber" /></label>
@@ -37,20 +37,61 @@
                     <label>العملة<input class="input" @bind="_settings.Currency" /></label>
                     <label>نسبة الضريبة (%)<input class="input" type="number" step="0.01" min="0" max="100" @bind="_settings.TaxRate" /></label>
                 </div>
-                <div class="modal-actions" style="justify-content:flex-end">
+                <div class="panel-header" style="margin-top:.5rem"><h3>إعدادات الإيصال الحراري</h3></div>
+                <div class="form-grid" style="padding:1rem">
+                    <label class="full">رأس الإيصال (ترحيب)
+                        <input class="input" @bind="_settings.ReceiptHeader" placeholder="مرحباً بكم" />
+                    </label>
+                    <label class="full">ذيل الإيصال (توديع)
+                        <input class="input" @bind="_settings.ReceiptFooter" placeholder="شكراً لزيارتكم" />
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                        <input type="checkbox" @bind="_settings.ShowTaxOnReceipt" />
+                        إظهار الضريبة على الإيصال
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                        <input type="checkbox" @bind="_settings.ShowQrOnReceipt" />
+                        إظهار رمز QR على الإيصال
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                        <input type="checkbox" @bind="_settings.PrintKitchenCopy" />
+                        طباعة قصاصة المطبخ تلقائياً
+                    </label>
+                </div>
+                <div class="panel-header" style="margin-top:.5rem"><h3>إعدادات نقطة البيع</h3></div>
+                <div class="form-grid" style="padding:1rem">
+                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer" class="full">
+                        <input type="checkbox" @bind="_settings.RestaurantMode" />
+                        وضع المطعم (أنواع الطلبات)
+                    </label>
+                    <label>نوع الطلب الأول (محلي)
+                        <input class="input" @bind="_settings.OrderTypeLocal" placeholder="محلي" />
+                    </label>
+                    <label>نوع الطلب الثاني (آمر صرف)
+                        <input class="input" @bind="_settings.OrderTypeTakeaway" placeholder="آمر صرف" />
+                    </label>
+                    <label>نوع الطلب الثالث (توصيل)
+                        <input class="input" @bind="_settings.OrderTypeDelivery" placeholder="توصيل" />
+                    </label>
+                </div>
+                <div class="modal-actions" style="justify-content:flex-end;padding:1rem">
                     <button type="submit" class="primary-btn">💾 حفظ الإعدادات</button>
                 </div>
             </EditForm>
         </div>
 
         <div class="panel">
-            <div class="panel-header"><h3>معاينة</h3></div>
+            <div class="panel-header"><h3>معاينة بطاقة الشركة</h3></div>
             <div style="padding:24px;text-align:center">
                 <div style="font-size:4rem">@_settings.LogoEmoji</div>
                 <h2 style="margin:8px 0">@_settings.Name</h2>
                 <div class="muted">@_settings.Address</div>
                 <div class="muted" dir="ltr">@_settings.Phone @(string.IsNullOrEmpty(_settings.Email) ? "" : "•") @_settings.Email</div>
                 <div class="muted">الرقم الضريبي: @_settings.TaxNumber • العملة: @_settings.Currency • الضريبة: @_settings.TaxRate%</div>
+                @if (!string.IsNullOrWhiteSpace(_settings.ReceiptHeader))
+                {
+                    <div class="muted" style="margin-top:.5rem;font-style:italic">رأس الإيصال: @_settings.ReceiptHeader</div>
+                }
             </div>
         </div>
     }
@@ -76,6 +117,15 @@
             Currency = s.Currency,
             TaxRate = s.TaxRate,
             LogoEmoji = s.LogoEmoji,
+            ReceiptHeader = s.ReceiptHeader,
+            ReceiptFooter = s.ReceiptFooter,
+            ShowTaxOnReceipt = s.ShowTaxOnReceipt,
+            ShowQrOnReceipt = s.ShowQrOnReceipt,
+            PrintKitchenCopy = s.PrintKitchenCopy,
+            RestaurantMode = s.RestaurantMode,
+            OrderTypeLocal = s.OrderTypeLocal,
+            OrderTypeTakeaway = s.OrderTypeTakeaway,
+            OrderTypeDelivery = s.OrderTypeDelivery,
         };
     }
 

@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,5 +40,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PurchaseInvoiceItem>().Property(i => i.LineTotal).HasConversion<double>();
         modelBuilder.Entity<Supplier>().Property(s => s.Balance).HasConversion<double>();
         modelBuilder.Entity<JournalEntry>().Property(j => j.Amount).HasConversion<double>();
+        modelBuilder.Entity<CashierShift>().Property(c => c.OpeningCash).HasConversion<double>();
+        modelBuilder.Entity<CashierShift>().Property(c => c.ClosingCash).HasConversion<double>();
+        modelBuilder.Entity<CashierShift>().Property(c => c.TotalSales).HasConversion<double>();
+        modelBuilder.Entity<CashierShift>().Property(c => c.TotalCash).HasConversion<double>();
+        modelBuilder.Entity<CashierShift>().Property(c => c.TotalCard).HasConversion<double>();
+        modelBuilder.Entity<CashierShift>().Property(c => c.TotalOther).HasConversion<double>();
     }
 }

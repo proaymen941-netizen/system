@@ -31,4 +31,24 @@ public class CompanySettings
 
     [MaxLength(10)]
     public string LogoEmoji { get; set; } = "🌿";
+
+    [MaxLength(200)]
+    public string ReceiptHeader { get; set; } = "مرحباً بكم";
+
+    [MaxLength(200)]
+    public string ReceiptFooter { get; set; } = "شكراً لزيارتكم — يسعدنا خدمتكم دائماً";
+
+    public bool ShowTaxOnReceipt { get; set; } = true;
+    public bool ShowQrOnReceipt { get; set; } = true;
+    public bool PrintKitchenCopy { get; set; } = true;
+    public bool RestaurantMode { get; set; } = false;
+
+    [MaxLength(100)]
+    public string OrderTypeLocal { get; set; } = "محلي";
+
+    [MaxLength(100)]
+    public string OrderTypeTakeaway { get; set; } = "آمر صرف";
+
+    [MaxLength(100)]
+    public string OrderTypeDelivery { get; set; } = "توصيل";
 }

@@ -1,0 +1,6 @@
+/home/runner/workspace/src/BusinessSuite/obj/Debug/net7.0/BusinessSuite.csproj.AssemblyReference.cache
+/home/runner/workspace/src/BusinessSuite/obj/Debug/net7.0/BusinessSuite.GeneratedMSBuildEditorConfig.editorconfig
+/home/runner/workspace/src/BusinessSuite/obj/Debug/net7.0/BusinessSuite.AssemblyInfoInputs.cache
+/home/runner/workspace/src/BusinessSuite/obj/Debug/net7.0/BusinessSuite.AssemblyInfo.cs
+/home/runner/workspace/src/BusinessSuite/obj/Debug/net7.0/BusinessSuite.csproj.CoreCompileInputs.cache
+/home/runner/workspace/src/BusinessSuite/obj/Debug/net7.0/BusinessSuite.MvcApplicationPartsAssemblyInfo.cache

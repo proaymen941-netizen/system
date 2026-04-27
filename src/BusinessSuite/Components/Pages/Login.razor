@@ -8,9 +8,22 @@
             <p>سجّل دخولك للمتابعة</p>
         </div>
 
+        <div class="login-tabs">
+            <button class="login-tab @(_byNumber ? "" : "active")" @onclick='() => { _byNumber = false; Error = null; }'>اسم المستخدم</button>
+            <button class="login-tab @(_byNumber ? "active" : "")" @onclick='() => { _byNumber = true; Error = null; }'>رقم المستخدم</button>
+        </div>
+
         <EditForm Model="this" OnValidSubmit="DoLogin" class="login-form">
-            <label>اسم المستخدم</label>
-            <input @bind="Username" placeholder="admin" autofocus />
+            @if (_byNumber)
+            {
+                <label>رقم المستخدم</label>
+                <input type="number" @bind="UserNumber" placeholder="مثال: 101" autofocus />
+            }
+            else
+            {
+                <label>اسم المستخدم</label>
+                <input @bind="Username" placeholder="admin" autofocus />
+            }
 
             <label>كلمة المرور</label>
             <input type="password" @bind="Password" placeholder="••••••" />
@@ -27,9 +40,9 @@
 
         <div class="login-hint">
             <strong>حسابات تجريبية:</strong>
-            <div>المدير: <code>admin / admin</code></div>
-            <div>المحاسب: <code>accountant / accountant</code></div>
-            <div>الكاشير: <code>cashier / cashier</code></div>
+            <div>المدير: <code>admin / admin</code> (رقم: <code>100</code>)</div>
+            <div>الكاشير: <code>cashier / cashier</code> (رقم: <code>101</code>)</div>
+            <div>المحاسب: <code>accountant / accountant</code> (رقم: <code>102</code>)</div>
         </div>
     </div>
 </div>
@@ -37,9 +50,11 @@
 @code {
     [Parameter] public EventCallback OnLoggedIn { get; set; }
     private string Username { get; set; } = "";
+    private int? UserNumber { get; set; }
     private string Password { get; set; } = "";
     private string? Error;
     private bool _busy;
+    private bool _byNumber;
 
     private async Task DoLogin()
     {
@@ -47,7 +62,12 @@
         _busy = true;
         try
         {
-            var ok = await Auth.LoginAsync(Username.Trim(), Password);
+            bool ok;
+            if (_byNumber && UserNumber.HasValue)
+                ok = await Auth.LoginByNumberAsync(UserNumber.Value, Password);
+            else
+                ok = await Auth.LoginAsync(Username.Trim(), Password);
+
             if (!ok) Error = "بيانات الدخول غير صحيحة";
             else await OnLoggedIn.InvokeAsync();
         }

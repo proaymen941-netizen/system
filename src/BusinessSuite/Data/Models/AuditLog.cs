@@ -38,4 +38,47 @@ public class AppUser
     public UserRole Role { get; set; } = UserRole.Employee;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+    public int? UserNumber { get; set; }
+
+    [MaxLength(120)]
+    public string Email { get; set; } = string.Empty;
+
+    [MaxLength(20)]
+    public string Phone { get; set; } = string.Empty;
+
+    [MaxLength(250)]
+    public string Address { get; set; } = string.Empty;
+
+    [MaxLength(80)]
+    public string Position { get; set; } = string.Empty;
+
+    [MaxLength(80)]
+    public string Department { get; set; } = string.Empty;
+
+    public DateTime? DateOfBirth { get; set; }
+
+    public int? EmployeeId { get; set; }
+}
+
+public class CashierShift
+{
+    public int Id { get; set; }
+    public int CashierId { get; set; }
+
+    [MaxLength(120)]
+    public string CashierName { get; set; } = string.Empty;
+    public DateTime OpenedAt { get; set; } = DateTime.Now;
+    public DateTime? ClosedAt { get; set; }
+    public decimal OpeningCash { get; set; }
+    public decimal ClosingCash { get; set; }
+    public decimal TotalSales { get; set; }
+    public decimal TotalCash { get; set; }
+    public decimal TotalCard { get; set; }
+    public decimal TotalOther { get; set; }
+    public int InvoiceCount { get; set; }
+
+    [MaxLength(300)]
+    public string Notes { get; set; } = string.Empty;
+    public bool IsClosed { get; set; }
 }
