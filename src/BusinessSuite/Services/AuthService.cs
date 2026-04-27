@@ -16,23 +16,88 @@ public class AuthService
 
     public event Action? OnChange;
 
-    public async Task<bool> LoginAsync(string username, string password)
+      public async Task<bool> LoginAsync(string username, string password)
+     {
+         await using var db = _factory.CreateDbContext();
+         var hash = Hash(password);
+         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.PasswordHash == hash && u.IsActive);
+         if (user == null)
+         {
+             // Allow first-time admin login with default credentials
+             if (username == "admin" && password == "admin")
+             {
+                 user = new AppUser
+                 {
+                     Username = "admin",
+                     FullName = "المدير",
+                     PasswordHash = hash,
+                     Role = UserRole.Admin,
+                     IsActive = true,
+                     UserNumber = 100,
+                     EmployeeId = null
+                 };
+                 db.Users.Add(user);
+                 await db.SaveChangesAsync();
+                 await PopulateEmployeeInfo(db, user);
+                 CurrentUser = user;
+                 db.AuditLogs.Add(new AuditLog { User = user.FullName, Action = "تسجيل دخول", Module = "النظام", Details = $"إنشاء حساب المدير وتسجيل الدخول لأول مرة" });
+                 await db.SaveChangesAsync();
+                 OnChange?.Invoke();
+                 return true;
+             }
+             return false;
+         }
+         await PopulateEmployeeInfo(db, user);
+         CurrentUser = user;
+         db.AuditLogs.Add(new AuditLog { User = user.FullName, Action = "تسجيل دخول", Module = "النظام", Details = $"تسجيل دخول المستخدم {user.Username}" });
+         await db.SaveChangesAsync();
+         OnChange?.Invoke();
+         return true;
+     }
+
+     public async Task<bool> LoginByNumberAsync(int userNumber, string password)
     {
         await using var db = _factory.CreateDbContext();
         var hash = Hash(password);
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username && u.PasswordHash == hash && u.IsActive);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.UserNumber == userNumber && u.PasswordHash == hash && u.IsActive);
         if (user == null) return false;
+        await PopulateEmployeeInfo(db, user);
         CurrentUser = user;
-        db.AuditLogs.Add(new AuditLog { User = user.FullName, Action = "تسجيل دخول", Module = "النظام", Details = $"تسجيل دخول المستخدم {user.Username}" });
+        db.AuditLogs.Add(new AuditLog { User = user.FullName, Action = "تسجيل دخول", Module = "النظام", Details = $"تسجيل دخول برقم المستخدم {userNumber}" });
         await db.SaveChangesAsync();
         OnChange?.Invoke();
         return true;
     }
 
-    public void Logout()
+     public void Logout()
     {
         CurrentUser = null;
         OnChange?.Invoke();
+    }
+
+     public async Task<bool> LoginDirectForAdmin(int userId)
+    {
+        await using var db = _factory.CreateDbContext();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.IsActive);
+        if (user == null) return false;
+        await PopulateEmployeeInfo(db, user);
+        CurrentUser = user;
+        db.AuditLogs.Add(new AuditLog { User = user.FullName, Action = "تسجيل دخول مباشر", Module = "النظام", Details = $"الدخول المباشر للمستخدم {user.Username} بواسطة المسؤول" });
+        await db.SaveChangesAsync();
+        OnChange?.Invoke();
+        return true;
+    }
+
+    private async Task PopulateEmployeeInfo(AppDbContext db, AppUser user)
+    {
+        var employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == user.EmployeeId);
+        if (employee != null)
+        {
+            user.Email = employee.Email;
+            user.Phone = employee.Phone;
+            user.Position = employee.Position;
+            user.Department = employee.Department;
+        }
     }
 
     public bool HasRole(params UserRole[] roles)

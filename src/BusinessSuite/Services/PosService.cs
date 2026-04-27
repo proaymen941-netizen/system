@@ -55,6 +55,16 @@ public class PosService
         invoice.Subtotal = invoice.Items.Sum(i => i.LineTotal);
         invoice.Tax = Math.Round(invoice.Subtotal * (settings.TaxRate / 100m), 2);
         invoice.Total = invoice.Subtotal + invoice.Tax;
+
+        if (_auth.CurrentUser != null)
+        {
+            invoice.CashierId = _auth.CurrentUser.Id;
+            invoice.CashierName = _auth.CurrentUser.FullName;
+        }
+
+        var today = DateTime.Today;
+        var todayCount = await db.SaleInvoices.CountAsync(s => s.Date >= today);
+        invoice.OrderNumber = todayCount + 1;
         if (invoice.PaymentStatus == InvoicePaymentStatus.Paid) { /* default */ }
         db.SaleInvoices.Add(invoice);
 
