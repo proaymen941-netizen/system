@@ -1,0 +1,77 @@
+{
+  "Version": 1,
+  "Hash": "o2ab5gHqdFUcfbX+TLQBO2+R07LoYyXey+BPTxhF8gI=",
+  "Source": "BusinessSuite",
+  "BasePath": "_content/BusinessSuite",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "BusinessSuite/wwwroot",
+      "Source": "BusinessSuite",
+      "ContentRoot": "/home/runner/workspace/src/BusinessSuite/wwwroot/",
+      "BasePath": "_content/BusinessSuite",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "/home/runner/workspace/src/BusinessSuite/wwwroot/app.css",
+      "SourceId": "BusinessSuite",
+      "SourceType": "Discovered",
+      "ContentRoot": "/home/runner/workspace/src/BusinessSuite/wwwroot/",
+      "BasePath": "_content/BusinessSuite",
+      "RelativePath": "app.css",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/app.css"
+    },
+    {
+      "Identity": "/home/runner/workspace/src/BusinessSuite/wwwroot/favicon.png",
+      "SourceId": "BusinessSuite",
+      "SourceType": "Discovered",
+      "ContentRoot": "/home/runner/workspace/src/BusinessSuite/wwwroot/",
+      "BasePath": "_content/BusinessSuite",
+      "RelativePath": "favicon.png",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/favicon.png"
+    },
+    {
+      "Identity": "/home/runner/workspace/src/BusinessSuite/wwwroot/sample/products.csv",
+      "SourceId": "BusinessSuite",
+      "SourceType": "Discovered",
+      "ContentRoot": "/home/runner/workspace/src/BusinessSuite/wwwroot/",
+      "BasePath": "_content/BusinessSuite",
+      "RelativePath": "sample/products.csv",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/sample/products.csv"
+    }
+  ]
+}

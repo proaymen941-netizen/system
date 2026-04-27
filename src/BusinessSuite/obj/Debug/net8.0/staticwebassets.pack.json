@@ -1,0 +1,33 @@
+{
+  "Files": [
+    {
+      "Id": "/home/runner/workspace/src/BusinessSuite/wwwroot/app.css",
+      "PackagePath": "staticwebassets/app.css"
+    },
+    {
+      "Id": "/home/runner/workspace/src/BusinessSuite/wwwroot/favicon.png",
+      "PackagePath": "staticwebassets/favicon.png"
+    },
+    {
+      "Id": "/home/runner/workspace/src/BusinessSuite/wwwroot/sample/products.csv",
+      "PackagePath": "staticwebassets/sample/products.csv"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.BusinessSuite.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.BusinessSuite.props",
+      "PackagePath": "build\\BusinessSuite.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.BusinessSuite.props",
+      "PackagePath": "buildMultiTargeting\\BusinessSuite.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.BusinessSuite.props",
+      "PackagePath": "buildTransitive\\BusinessSuite.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
