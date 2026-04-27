@@ -1,0 +1,101 @@
+@page "/stock-movements"
+@rendermode InteractiveServer
+@inject StockMovementService Stock
+@inject InventoryService Inv
+
+<PageTitle>حركة المخزون</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">سجل حركة المخزون</h1>
+            <p class="page-subtitle">تتبع كل تغيير في الكميات (شراء، بيع، إرجاع، تعديل)</p>
+        </div>
+        <div class="page-header-actions">
+            <a class="ghost-btn" href="@ExportUrl("csv")" target="_blank">⬇️ CSV</a>
+            <a class="ghost-btn" href="@ExportUrl("xlsx")" target="_blank">📊 Excel</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h3>الفلاتر</h3>
+        </div>
+        <div class="form-grid">
+            <label>الصنف
+                <select class="input" @bind="_productId" @bind:after="Refresh">
+                    <option value="0">— الكل —</option>
+                    @foreach (var p in _products) { <option value="@p.Id">@p.Name</option> }
+                </select>
+            </label>
+            <label>من<input class="input" type="date" @bind="_from" @bind:after="Refresh" /></label>
+            <label>إلى<input class="input" type="date" @bind="_to" @bind:after="Refresh" /></label>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><h3>الحركات (@_movements.Count)</h3></div>
+        <table class="table-soft striped">
+            <thead><tr><th>التاريخ</th><th>الصنف</th><th>النوع</th><th>التغيير</th><th>الرصيد</th><th>المرجع</th><th>المستخدم</th><th>ملاحظات</th></tr></thead>
+            <tbody>
+                @if (!_movements.Any())
+                {
+                    <tr><td colspan="8" class="empty">لا توجد حركات</td></tr>
+                }
+                @foreach (var m in _movements)
+                {
+                    <tr>
+                        <td>@m.Date.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@m.ProductName</td>
+                        <td>@TypeLabel(m.Type)</td>
+                        <td><strong class="@(m.Change >= 0 ? "text-green" : "text-red")">@(m.Change >= 0 ? "+" : "")@m.Change</strong></td>
+                        <td>@m.BalanceAfter</td>
+                        <td class="muted">@m.Reference</td>
+                        <td class="muted">@m.User</td>
+                        <td class="muted">@m.Notes</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private List<StockMovement> _movements = new();
+    private List<Product> _products = new();
+    private int _productId = 0;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await Inv.GetProductsAsync();
+        await Refresh();
+    }
+
+    private async Task Refresh()
+    {
+        int? pid = _productId == 0 ? null : _productId;
+        _movements = await Stock.GetAsync(pid, _from, _to);
+    }
+
+    private string TypeLabel(MovementType t) => t switch
+    {
+        MovementType.Purchase => "شراء",
+        MovementType.Sale => "بيع",
+        MovementType.Return => "إرجاع",
+        MovementType.Adjustment => "تعديل",
+        MovementType.Cancellation => "إلغاء",
+        MovementType.Initial => "ابتدائي",
+        _ => t.ToString(),
+    };
+
+    private string ExportUrl(string format)
+    {
+        var qs = new List<string>();
+        if (_productId > 0) qs.Add($"productId={_productId}");
+        if (_from.HasValue) qs.Add($"from={_from:yyyy-MM-dd}");
+        if (_to.HasValue) qs.Add($"to={_to:yyyy-MM-dd}");
+        return $"/export/stock-movements.{format}" + (qs.Any() ? "?" + string.Join("&", qs) : "");
+    }
+}

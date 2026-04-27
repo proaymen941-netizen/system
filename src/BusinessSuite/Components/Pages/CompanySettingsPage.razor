@@ -1,0 +1,94 @@
+@page "/company-settings"
+@rendermode InteractiveServer
+@inject CompanySettingsService SettingsSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>إعدادات الشركة</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">إعدادات الشركة</h1>
+            <p class="page-subtitle">المعلومات الأساسية، العملة، نسبة الضريبة</p>
+        </div>
+    </div>
+
+    @if (!Auth.HasRole(UserRole.Admin))
+    {
+        <div class="error-banner">⚠️ هذه الصفحة متاحة لمدير النظام فقط</div>
+    }
+    else if (_settings != null)
+    {
+        @if (!string.IsNullOrEmpty(_message)) { <div class="success-banner">@_message</div> }
+        @if (!string.IsNullOrEmpty(_error)) { <div class="error-banner">@_error</div> }
+
+        <div class="panel">
+            <div class="panel-header"><h3>المعلومات الأساسية</h3></div>
+            <EditForm Model="_settings" OnValidSubmit="Save">
+                <div class="form-grid">
+                    <label>اسم الشركة<input class="input" @bind="_settings.Name" required /></label>
+                    <label>الرمز/الشعار (إيموجي)<input class="input" @bind="_settings.LogoEmoji" /></label>
+                    <label>الرقم الضريبي<input class="input" @bind="_settings.TaxNumber" /></label>
+                    <label>السجل التجاري<input class="input" @bind="_settings.CommercialRegister" /></label>
+                    <label>الهاتف<input class="input" @bind="_settings.Phone" /></label>
+                    <label>البريد الإلكتروني<input class="input" @bind="_settings.Email" /></label>
+                    <label class="full">العنوان<input class="input" @bind="_settings.Address" /></label>
+                    <label>العملة<input class="input" @bind="_settings.Currency" /></label>
+                    <label>نسبة الضريبة (%)<input class="input" type="number" step="0.01" min="0" max="100" @bind="_settings.TaxRate" /></label>
+                </div>
+                <div class="modal-actions" style="justify-content:flex-end">
+                    <button type="submit" class="primary-btn">💾 حفظ الإعدادات</button>
+                </div>
+            </EditForm>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header"><h3>معاينة</h3></div>
+            <div style="padding:24px;text-align:center">
+                <div style="font-size:4rem">@_settings.LogoEmoji</div>
+                <h2 style="margin:8px 0">@_settings.Name</h2>
+                <div class="muted">@_settings.Address</div>
+                <div class="muted" dir="ltr">@_settings.Phone @(string.IsNullOrEmpty(_settings.Email) ? "" : "•") @_settings.Email</div>
+                <div class="muted">الرقم الضريبي: @_settings.TaxNumber • العملة: @_settings.Currency • الضريبة: @_settings.TaxRate%</div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private CompanySettings? _settings;
+    private string _message = "";
+    private string _error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var s = await SettingsSvc.GetAsync();
+        _settings = new CompanySettings
+        {
+            Id = s.Id,
+            Name = s.Name,
+            TaxNumber = s.TaxNumber,
+            CommercialRegister = s.CommercialRegister,
+            Phone = s.Phone,
+            Email = s.Email,
+            Address = s.Address,
+            Currency = s.Currency,
+            TaxRate = s.TaxRate,
+            LogoEmoji = s.LogoEmoji,
+        };
+    }
+
+    private async Task Save()
+    {
+        if (_settings == null) return;
+        try
+        {
+            await SettingsSvc.SaveAsync(_settings);
+            await Audit.LogAsync("تعديل إعدادات الشركة", "النظام", _settings.Name);
+            _message = "✅ تم حفظ الإعدادات بنجاح";
+            _error = "";
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; _message = ""; }
+    }
+}

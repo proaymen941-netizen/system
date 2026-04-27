@@ -1,0 +1,119 @@
+@page "/users"
+@inject AuthService Auth
+@inject AuditService Audit
+
+<div class="page-header">
+    <div>
+        <h1>المستخدمون والصلاحيات</h1>
+        <p class="muted">إدارة حسابات الدخول والأدوار</p>
+    </div>
+    @if (Auth.HasRole(UserRole.Admin))
+    {
+        <button class="btn-primary" @onclick="NewUser">+ مستخدم جديد</button>
+    }
+</div>
+
+@if (!Auth.HasRole(UserRole.Admin))
+{
+    <div class="alert-warning">صلاحية الوصول لهذه الصفحة مقصورة على المدير.</div>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>اسم المستخدم</th>
+                    <th>الاسم الكامل</th>
+                    <th>الدور</th>
+                    <th>الحالة</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in _users)
+                {
+                    <tr>
+                        <td><code>@u.Username</code></td>
+                        <td>@u.FullName</td>
+                        <td><span class="role-pill role-@u.Role.ToString().ToLower()">@RoleAr(u.Role)</span></td>
+                        <td>@(u.IsActive ? "نشط" : "موقوف")</td>
+                        <td>
+                            <button class="btn-link" @onclick="() => Edit(u)">تعديل</button>
+                            @if (u.Username != "admin")
+                            {
+                                <button class="btn-link danger" @onclick="() => Delete(u)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-backdrop" @onclick="Cancel">
+            <div class="modal-card" @onclick:stopPropagation="true">
+                <h2>@(_editing.Id == 0 ? "إضافة مستخدم" : "تعديل مستخدم")</h2>
+                <label>اسم المستخدم</label>
+                <input @bind="_editing.Username" />
+                <label>الاسم الكامل</label>
+                <input @bind="_editing.FullName" />
+                <label>الدور</label>
+                <select @bind="_editing.Role">
+                    <option value="@UserRole.Admin">مدير</option>
+                    <option value="@UserRole.Accountant">محاسب</option>
+                    <option value="@UserRole.Cashier">كاشير</option>
+                    <option value="@UserRole.Employee">موظف</option>
+                </select>
+                <label>كلمة المرور @(_editing.Id == 0 ? "" : "(اتركها فارغة لعدم التغيير)")</label>
+                <input type="password" @bind="_password" />
+                <label class="check"><input type="checkbox" @bind="_editing.IsActive" /> نشط</label>
+                <div class="modal-actions">
+                    <button class="btn-primary" @onclick="Save">حفظ</button>
+                    <button class="btn-secondary" @onclick="Cancel">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<AppUser> _users = new();
+    private AppUser? _editing;
+    private string _password = "";
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() => _users = await Auth.GetUsersAsync();
+
+    private void NewUser() { _editing = new AppUser { IsActive = true, Role = UserRole.Employee }; _password = ""; }
+    private void Edit(AppUser u) { _editing = new AppUser { Id = u.Id, Username = u.Username, FullName = u.FullName, Role = u.Role, IsActive = u.IsActive, PasswordHash = u.PasswordHash, CreatedAt = u.CreatedAt }; _password = ""; }
+    private void Cancel() { _editing = null; _password = ""; }
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        await Auth.SaveUserAsync(_editing, string.IsNullOrEmpty(_password) ? null : _password);
+        await Audit.LogAsync(_editing.Id == 0 ? "إضافة مستخدم" : "تعديل مستخدم", "المستخدمون", _editing.Username);
+        _editing = null;
+        _password = "";
+        await Reload();
+    }
+
+    private async Task Delete(AppUser u)
+    {
+        await Auth.DeleteUserAsync(u.Id);
+        await Audit.LogAsync("حذف مستخدم", "المستخدمون", u.Username);
+        await Reload();
+    }
+
+    private static string RoleAr(UserRole r) => r switch
+    {
+        UserRole.Admin => "مدير",
+        UserRole.Accountant => "محاسب",
+        UserRole.Cashier => "كاشير",
+        _ => "موظف"
+    };
+}

@@ -1,0 +1,126 @@
+@page "/hr"
+@rendermode InteractiveServer
+@inject HrService HrSvc
+
+<PageTitle>الموارد البشرية</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">الموارد البشرية</h1>
+            <p class="page-subtitle">إدارة الموظفين، الحضور، الإجازات والرواتب</p>
+        </div>
+        <button class="primary-btn" @onclick="StartNew">+ إضافة موظف</button>
+    </div>
+
+    <div class="stat-grid stat-grid-3">
+        <div class="stat-card stat-purple">
+            <div class="stat-icon">👥</div>
+            <div class="stat-body"><div class="stat-label">إجمالي الموظفين</div><div class="stat-value">@_employees.Count</div></div>
+        </div>
+        <div class="stat-card stat-green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-body"><div class="stat-label">موظفون نشطون</div><div class="stat-value">@_employees.Count(e => e.Status == EmployeeStatus.Active)</div></div>
+        </div>
+        <div class="stat-card stat-blue">
+            <div class="stat-icon">💵</div>
+            <div class="stat-body"><div class="stat-label">إجمالي الرواتب</div><div class="stat-value">@_totalSalary.ToString("N0") <span class="stat-unit">ريال</span></div></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><h3>قائمة الموظفين</h3><input class="input-search" placeholder="بحث..." @bind="_search" @bind:event="oninput" /></div>
+        <table class="table-soft striped">
+            <thead><tr><th>الاسم</th><th>القسم</th><th>الوظيفة</th><th>الهاتف</th><th>الراتب</th><th>الحالة</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var e in Filtered)
+                {
+                    <tr>
+                        <td><div class="cell-avatar"><div class="avatar small">@e.Name.FirstOrDefault()</div>@e.Name</div></td>
+                        <td>@e.Department</td>
+                        <td>@e.Position</td>
+                        <td dir="ltr">@e.Phone</td>
+                        <td>@e.Salary.ToString("N0")</td>
+                        <td>
+                            @switch (e.Status)
+                            {
+                                case EmployeeStatus.Active: <span class="tag tag-success">نشط</span> break;
+                                case EmployeeStatus.OnLeave: <span class="tag tag-warning">في إجازة</span> break;
+                                default: <span class="tag tag-muted">غير نشط</span> break;
+                            }
+                        </td>
+                        <td>
+                            <button class="link" @onclick="() => Edit(e)">تعديل</button>
+                            <button class="link danger" @onclick="() => Delete(e.Id)">حذف</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="Cancel">
+            <div class="modal" @onclick:stopPropagation="true">
+                <h3>@(_editing.Id == 0 ? "إضافة موظف" : "تعديل موظف")</h3>
+                <EditForm Model="_editing" OnValidSubmit="Save">
+                    <div class="form-grid">
+                        <label>الاسم<input class="input" @bind="_editing.Name" required /></label>
+                        <label>القسم<input class="input" @bind="_editing.Department" /></label>
+                        <label>الوظيفة<input class="input" @bind="_editing.Position" /></label>
+                        <label>الهاتف<input class="input" @bind="_editing.Phone" /></label>
+                        <label>البريد<input class="input" @bind="_editing.Email" /></label>
+                        <label>الراتب<input class="input" type="number" step="0.01" @bind="_editing.Salary" /></label>
+                        <label>تاريخ التوظيف<input class="input" type="date" @bind="_editing.HireDate" /></label>
+                        <label>الحالة
+                            <select class="input" @bind="_editing.Status">
+                                <option value="@EmployeeStatus.Active">نشط</option>
+                                <option value="@EmployeeStatus.OnLeave">في إجازة</option>
+                                <option value="@EmployeeStatus.Inactive">غير نشط</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="ghost-btn" @onclick="Cancel">إلغاء</button>
+                        <button type="submit" class="primary-btn">حفظ</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Employee> _employees = new();
+    private decimal _totalSalary;
+    private string _search = "";
+    private Employee? _editing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _employees = await HrSvc.GetEmployeesAsync();
+        _totalSalary = await HrSvc.GetTotalPayrollAsync();
+    }
+
+    private IEnumerable<Employee> Filtered => string.IsNullOrWhiteSpace(_search) ? _employees :
+        _employees.Where(e => e.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) || e.Department.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    private void StartNew() => _editing = new Employee { HireDate = DateTime.Today };
+    private void Edit(Employee e) => _editing = new Employee { Id = e.Id, Name = e.Name, Department = e.Department, Position = e.Position, Phone = e.Phone, Email = e.Email, Salary = e.Salary, HireDate = e.HireDate, Status = e.Status };
+    private void Cancel() => _editing = null;
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        await HrSvc.SaveEmployeeAsync(_editing);
+        _editing = null;
+        await OnInitializedAsync();
+    }
+
+    private async Task Delete(int id)
+    {
+        await HrSvc.DeleteEmployeeAsync(id);
+        await OnInitializedAsync();
+    }
+}

@@ -1,0 +1,54 @@
+@page "/audit"
+@inject AuditService Audit
+@inject AuthService Auth
+
+<div class="page-header">
+    <div>
+        <h1>سجل العمليات</h1>
+        <p class="muted">آخر 200 عملية تم تنفيذها داخل النظام</p>
+    </div>
+    <button class="btn-secondary" @onclick="Reload">تحديث</button>
+</div>
+
+@if (!Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+{
+    <div class="alert-warning">عرض السجل متاح للمدير والمحاسب فقط.</div>
+}
+else
+{
+    <div class="card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>المستخدم</th>
+                    <th>الإجراء</th>
+                    <th>القسم</th>
+                    <th>التفاصيل</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (_logs.Count == 0)
+                {
+                    <tr><td colspan="5" class="empty">لا توجد عمليات بعد</td></tr>
+                }
+                @foreach (var l in _logs)
+                {
+                    <tr>
+                        <td>@l.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@l.User</td>
+                        <td>@l.Action</td>
+                        <td>@l.Module</td>
+                        <td>@l.Details</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<AuditLog> _logs = new();
+    protected override async Task OnInitializedAsync() => await Reload();
+    private async Task Reload() => _logs = await Audit.GetLogsAsync();
+}

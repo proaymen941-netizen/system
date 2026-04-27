@@ -1,0 +1,169 @@
+@page "/"
+@rendermode InteractiveServer
+@inject DashboardService Dashboard
+
+<PageTitle>لوحة التحكم</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">لوحة التحكم</h1>
+            <p class="page-subtitle">نظرة عامة على أداء أعمالك اليوم</p>
+        </div>
+        <div class="page-header-actions">
+            <span class="chip chip-soft">@DateTime.Now.ToString("dddd، dd MMMM yyyy", new System.Globalization.CultureInfo("ar-SA"))</span>
+        </div>
+    </div>
+
+    @if (_data is null)
+    {
+        <div class="loading">جاري التحميل...</div>
+    }
+    else
+    {
+        <div class="stat-grid">
+            <div class="stat-card stat-green">
+                <div class="stat-icon">🛒</div>
+                <div class="stat-body">
+                    <div class="stat-label">إجمالي المبيعات</div>
+                    <div class="stat-value">@_data.TotalSales.ToString("N0") <span class="stat-unit">ريال</span></div>
+                </div>
+            </div>
+            <div class="stat-card stat-blue">
+                <div class="stat-icon">🧾</div>
+                <div class="stat-body">
+                    <div class="stat-label">إجمالي المشتريات</div>
+                    <div class="stat-value">@_data.TotalPurchases.ToString("N0") <span class="stat-unit">ريال</span></div>
+                </div>
+            </div>
+            <div class="stat-card stat-purple">
+                <div class="stat-icon">💰</div>
+                <div class="stat-body">
+                    <div class="stat-label">إجمالي الأرباح</div>
+                    <div class="stat-value">@_data.Profit.ToString("N0") <span class="stat-unit">ريال</span></div>
+                </div>
+            </div>
+            <div class="stat-card stat-orange">
+                <div class="stat-icon">📦</div>
+                <div class="stat-body">
+                    <div class="stat-label">المخزون الحالي</div>
+                    <div class="stat-value">@_data.LowStockCount <span class="stat-unit">صنف منخفض</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>المبيعات خلال آخر 7 أيام</h3>
+                </div>
+                <div class="bar-chart">
+                    @{
+                        var max = Math.Max(1m, _data.DailySales.Max(x => x.Amount));
+                    }
+                    @foreach (var d in _data.DailySales)
+                    {
+                        var h = (int)((double)d.Amount / (double)max * 100);
+                        <div class="bar-col">
+                            <div class="bar-track">
+                                <div class="bar-fill" style="height:@(h)%"></div>
+                            </div>
+                            <div class="bar-label">@d.Day</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>توزيع المبيعات حسب الفئة</h3>
+                </div>
+                <div class="donut-wrap">
+                    @{
+                        var total = Math.Max(1m, _data.CategoryBreakdown.Sum(c => c.Amount));
+                        decimal acc = 0;
+                        var colors = new[] { "#3b82f6", "#10b981", "#f59e0b", "#a855f7", "#ef4444" };
+                        var stops = new List<string>();
+                        var legends = new List<(string name, string color, decimal pct)>();
+                        for (int i = 0; i < _data.CategoryBreakdown.Count; i++)
+                        {
+                            var c = _data.CategoryBreakdown[i];
+                            var pct = (c.Amount / total) * 100m;
+                            var start = acc;
+                            acc += pct;
+                            stops.Add($"{colors[i % colors.Length]} {start.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}% {acc.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%");
+                            legends.Add((c.Category, colors[i % colors.Length], Math.Round(pct)));
+                        }
+                        var gradient = "conic-gradient(" + string.Join(",", stops) + ")";
+                    }
+                    <div class="donut" style="background:@gradient"></div>
+                    <ul class="donut-legend">
+                        @foreach (var l in legends)
+                        {
+                            <li><span class="dot" style="background:@l.color"></span>@l.name <strong>@l.pct%</strong></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mini-stats">
+            <div class="mini-card"><div class="mini-icon green">🧾</div><div><div class="mini-value">@_data.TransactionsToday</div><div class="mini-label">معاملات اليوم</div></div></div>
+            <div class="mini-card"><div class="mini-icon orange">⚠️</div><div><div class="mini-value">@_data.LowStockCount</div><div class="mini-label">العناصر المنخفضة</div></div></div>
+            <div class="mini-card"><div class="mini-icon blue">🏢</div><div><div class="mini-value">@_data.SuppliersCount</div><div class="mini-label">الموردون</div></div></div>
+            <div class="mini-card"><div class="mini-icon purple">👥</div><div><div class="mini-value">@_data.EmployeesCount</div><div class="mini-label">الموظفون</div></div></div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <div class="panel-header"><h3>تنبيهات المخزون</h3><a href="/inventory" class="link">عرض الكل</a></div>
+                <table class="table-soft">
+                    <thead><tr><th>الصنف</th><th>الكمية</th><th>الحالة</th></tr></thead>
+                    <tbody>
+                        @foreach (var l in _data.LowStock.Take(5))
+                        {
+                            <tr>
+                                <td><span class="emoji">@l.Emoji</span> @l.Name</td>
+                                <td>@l.Quantity</td>
+                                <td><span class="tag tag-danger">منخفض</span></td>
+                            </tr>
+                        }
+                        @if (!_data.LowStock.Any())
+                        {
+                            <tr><td colspan="3" class="muted">لا توجد تنبيهات</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h3>آخر العمليات</h3><a href="/sales" class="link">عرض الكل</a></div>
+                <table class="table-soft">
+                    <thead><tr><th>الوقت</th><th>العملية</th><th>المبلغ</th></tr></thead>
+                    <tbody>
+                        @foreach (var s in _data.RecentSales)
+                        {
+                            <tr>
+                                <td>@s.Date.ToString("HH:mm")</td>
+                                <td>بيع — فاتورة @s.Number</td>
+                                <td><strong>@s.Amount.ToString("N2") ريال</strong></td>
+                            </tr>
+                        }
+                        @if (!_data.RecentSales.Any())
+                        {
+                            <tr><td colspan="3" class="muted">لا توجد عمليات بعد</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardSummary? _data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _data = await Dashboard.GetSummaryAsync();
+    }
+}

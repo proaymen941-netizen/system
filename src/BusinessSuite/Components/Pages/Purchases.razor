@@ -1,0 +1,255 @@
+@page "/purchases"
+@rendermode InteractiveServer
+@inject PurchasingService Purchasing
+@inject InventoryService Inventory
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>المشتريات</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">المشتريات والموردون</h1>
+            <p class="page-subtitle">أوامر الشراء وإدارة الموردين</p>
+        </div>
+        <div class="page-header-actions">
+            <a class="ghost-btn" href="@ExportUrl("csv")" target="_blank">⬇️ CSV</a>
+            <a class="ghost-btn" href="@ExportUrl("xlsx")" target="_blank">📊 Excel</a>
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+            {
+                <button class="ghost-btn" @onclick="StartNewSupplier">+ مورد</button>
+                <button class="primary-btn" @onclick="StartNewInvoice">+ فاتورة شراء</button>
+            }
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><h3>الفلاتر</h3></div>
+        <div class="form-grid">
+            <label>من<input class="input" type="date" @bind="_from" @bind:after="Refresh" /></label>
+            <label>إلى<input class="input" type="date" @bind="_to" @bind:after="Refresh" /></label>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error)) { <div class="error-banner">@_error</div> }
+
+    <div class="grid-2">
+        <div class="panel">
+            <div class="panel-header"><h3>الموردون (@_suppliers.Count)</h3></div>
+            <table class="table-soft striped">
+                <thead><tr><th>الاسم</th><th>الهاتف</th><th>الرصيد</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var s in _suppliers)
+                    {
+                        <tr>
+                            <td>@s.Name</td>
+                            <td dir="ltr">@s.Phone</td>
+                            <td>@s.Balance.ToString("N2")</td>
+                            <td>
+                                @if (Auth.HasRole(UserRole.Admin))
+                                {
+                                    <button class="link danger" @onclick="() => DeleteSupplier(s.Id)">حذف</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header"><h3>فواتير الشراء (@_purchases.Count)</h3></div>
+            <table class="table-soft striped">
+                <thead><tr><th>الرقم</th><th>المورد</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in _purchases)
+                    {
+                        <tr>
+                            <td>@p.InvoiceNumber</td>
+                            <td>@(p.Supplier?.Name ?? "-")</td>
+                            <td>@p.Date.ToString("yyyy-MM-dd")</td>
+                            <td>@p.Total.ToString("N2")</td>
+                            <td>
+                                @if (p.PaymentStatus == InvoicePaymentStatus.Paid) { <span class="tag tag-success">مدفوعة</span> }
+                                else { <span class="tag tag-warning">غير مدفوعة</span> }
+                            </td>
+                            <td>
+                                <a class="link" href="@($"/print/purchase/{p.Id}")" target="_blank">🖨️</a>
+                                @if (p.PaymentStatus != InvoicePaymentStatus.Paid && Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+                                {
+                                    <button class="link" @onclick="() => MarkPaid(p.Id)">سداد</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_supplier != null)
+    {
+        <div class="modal-overlay" @onclick="CancelSupplier">
+            <div class="modal" @onclick:stopPropagation="true">
+                <h3>مورد جديد</h3>
+                <EditForm Model="_supplier" OnValidSubmit="SaveSupplier">
+                    <div class="form-grid">
+                        <label>الاسم<input class="input" @bind="_supplier.Name" required /></label>
+                        <label>الهاتف<input class="input" @bind="_supplier.Phone" /></label>
+                        <label>البريد<input class="input" @bind="_supplier.Email" /></label>
+                        <label>العنوان<input class="input" @bind="_supplier.Address" /></label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="ghost-btn" @onclick="CancelSupplier">إلغاء</button>
+                        <button type="submit" class="primary-btn">حفظ</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    @if (_invoice != null)
+    {
+        <div class="modal-overlay" @onclick="CancelInvoice">
+            <div class="modal large" @onclick:stopPropagation="true">
+                <h3>فاتورة شراء جديدة</h3>
+                <div class="form-grid">
+                    <label>المورد
+                        <select class="input" @bind="_invoice.SupplierId">
+                            @foreach (var s in _suppliers) { <option value="@s.Id">@s.Name</option> }
+                        </select>
+                    </label>
+                    <label>الحالة
+                        <select class="input" @bind="_invoice.Status">
+                            <option>مدفوع</option><option>معلق</option>
+                        </select>
+                    </label>
+                </div>
+
+                <h4 style="margin-top:1rem">الأصناف</h4>
+                <table class="table-soft">
+                    <thead><tr><th>الصنف</th><th>الكمية</th><th>التكلفة</th><th>الإجمالي</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var item in _invoice.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <select class="input" @bind="item.ProductId" @bind:after="() => OnProductChanged(item)">
+                                        @foreach (var p in _products) { <option value="@p.Id">@p.Name</option> }
+                                    </select>
+                                </td>
+                                <td><input class="input" type="number" min="1" @bind="item.Quantity" @bind:after="() => Recalc(item)" /></td>
+                                <td><input class="input" type="number" step="0.01" @bind="item.UnitCost" @bind:after="() => Recalc(item)" /></td>
+                                <td>@item.LineTotal.ToString("N2")</td>
+                                <td><button class="link danger" @onclick="() => _invoice!.Items.Remove(item)">×</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <button class="ghost-btn small" @onclick="AddLine">+ إضافة صنف</button>
+
+                <div class="cart-summary" style="margin-top:1rem">
+                    <div class="row total"><span>الإجمالي</span><span>@_invoice.Items.Sum(i => i.LineTotal).ToString("N2") ريال</span></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="ghost-btn" @onclick="CancelInvoice">إلغاء</button>
+                    <button type="button" class="primary-btn" @onclick="SaveInvoice">حفظ الفاتورة</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Supplier> _suppliers = new();
+    private List<PurchaseInvoice> _purchases = new();
+    private List<Product> _products = new();
+    private Supplier? _supplier;
+    private PurchaseInvoice? _invoice;
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _error = "";
+
+    protected override async Task OnInitializedAsync() => await Refresh();
+
+    private async Task Refresh()
+    {
+        _suppliers = await Purchasing.GetSuppliersAsync();
+        _purchases = await Purchasing.GetPurchasesAsync(_from, _to);
+        _products = await Inventory.GetProductsAsync();
+    }
+
+    private void StartNewSupplier() => _supplier = new Supplier();
+    private void CancelSupplier() { _supplier = null; _error = ""; }
+    private async Task SaveSupplier()
+    {
+        if (_supplier == null) return;
+        try
+        {
+            await Purchasing.SaveSupplierAsync(_supplier);
+            await Audit.LogAsync("إضافة مورد", "المشتريات", _supplier.Name);
+            _supplier = null;
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+
+    private async Task DeleteSupplier(int id)
+    {
+        try { await Purchasing.DeleteSupplierAsync(id); await Refresh(); }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+
+    private void StartNewInvoice()
+    {
+        if (!_suppliers.Any()) return;
+        _invoice = new PurchaseInvoice { SupplierId = _suppliers.First().Id };
+        AddLine();
+    }
+    private void CancelInvoice() { _invoice = null; _error = ""; }
+    private void AddLine()
+    {
+        if (_invoice == null || !_products.Any()) return;
+        var p = _products.First();
+        _invoice.Items.Add(new PurchaseInvoiceItem { ProductId = p.Id, ProductName = p.Name, Quantity = 1, UnitCost = p.Cost, LineTotal = p.Cost });
+    }
+    private void OnProductChanged(PurchaseInvoiceItem item)
+    {
+        var p = _products.FirstOrDefault(x => x.Id == item.ProductId);
+        if (p != null) { item.ProductName = p.Name; item.UnitCost = p.Cost; Recalc(item); }
+    }
+    private void Recalc(PurchaseInvoiceItem item) => item.LineTotal = item.Quantity * item.UnitCost;
+
+    private async Task SaveInvoice()
+    {
+        if (_invoice == null) return;
+        try
+        {
+            await Purchasing.CreatePurchaseAsync(_invoice);
+            await Audit.LogAsync("إضافة فاتورة شراء", "المشتريات", _invoice.InvoiceNumber);
+            _invoice = null;
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+
+    private async Task MarkPaid(int id)
+    {
+        try
+        {
+            await Purchasing.SetPaymentStatusAsync(id, InvoicePaymentStatus.Paid);
+            await Audit.LogAsync("سداد فاتورة شراء", "المشتريات", $"ID={id}");
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+
+    private string ExportUrl(string format)
+    {
+        var qs = new List<string>();
+        if (_from.HasValue) qs.Add($"from={_from:yyyy-MM-dd}");
+        if (_to.HasValue) qs.Add($"to={_to:yyyy-MM-dd}");
+        return $"/export/purchases.{format}" + (qs.Any() ? "?" + string.Join("&", qs) : "");
+    }
+}

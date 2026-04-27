@@ -1,0 +1,117 @@
+@inherits LayoutComponentBase
+@inject AuthService Auth
+@inject NotificationService Notifications
+@inject NavigationManager Nav
+@implements IDisposable
+
+@if (!Auth.IsAuthenticated)
+{
+    <Login OnLoggedIn="HandleLoggedIn" />
+}
+else
+{
+    <div class="app-shell">
+        <NavMenu />
+        <main class="app-main">
+            <header class="app-topbar">
+                <div class="topbar-search">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" placeholder="بحث في النظام..." />
+                </div>
+                <div class="topbar-actions">
+                    <div class="notif-wrap">
+                        <button class="icon-btn" @onclick="ToggleNotif" title="الإشعارات">
+                            🔔
+                            @if (_notifs.Count > 0)
+                            {
+                                <span class="badge-dot"></span>
+                            }
+                        </button>
+                        @if (_notifOpen)
+                        {
+                            <div class="notif-dropdown">
+                                <div class="notif-header">الإشعارات (@_notifs.Count)</div>
+                                @if (_notifs.Count == 0)
+                                {
+                                    <div class="notif-empty">لا توجد إشعارات حالياً</div>
+                                }
+                                else
+                                {
+                                    @foreach (var n in _notifs)
+                                    {
+                                        <a class="notif-item kind-@n.Kind.ToString().ToLower()" href="@n.Link" @onclick="() => _notifOpen = false">
+                                            <span class="notif-emoji">@n.Emoji</span>
+                                            <div class="notif-body">
+                                                <div class="notif-title">@n.Title</div>
+                                                <div class="notif-msg">@n.Message</div>
+                                            </div>
+                                        </a>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                    <button class="icon-btn" title="الإعدادات" @onclick='() => Nav.NavigateTo("/settings")'>⚙️</button>
+                    <div class="user-chip">
+                        <div class="avatar">@(Auth.CurrentUser!.FullName.FirstOrDefault())</div>
+                        <div class="user-info">
+                            <div class="user-name">@Auth.CurrentUser!.FullName</div>
+                            <div class="user-role">@RoleAr(Auth.CurrentUser!.Role)</div>
+                        </div>
+                        <button class="icon-btn logout-btn" title="تسجيل الخروج" @onclick="DoLogout">⏻</button>
+                    </div>
+                </div>
+            </header>
+            <div class="app-content">
+                @Body
+            </div>
+        </main>
+    </div>
+}
+
+@code {
+    private bool _notifOpen;
+    private List<Notification> _notifs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += OnAuthChanged;
+        if (Auth.IsAuthenticated) await LoadNotifications();
+    }
+
+    private async Task LoadNotifications()
+    {
+        try { _notifs = await Notifications.GetAsync(); }
+        catch { _notifs = new(); }
+    }
+
+    private async Task ToggleNotif()
+    {
+        _notifOpen = !_notifOpen;
+        if (_notifOpen) await LoadNotifications();
+    }
+
+    private async Task HandleLoggedIn()
+    {
+        await LoadNotifications();
+        StateHasChanged();
+    }
+
+    private void DoLogout()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/", forceLoad: false);
+    }
+
+    private void OnAuthChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Auth.OnChange -= OnAuthChanged;
+
+    private static string RoleAr(UserRole r) => r switch
+    {
+        UserRole.Admin => "مدير النظام",
+        UserRole.Accountant => "محاسب",
+        UserRole.Cashier => "كاشير",
+        _ => "موظف"
+    };
+}

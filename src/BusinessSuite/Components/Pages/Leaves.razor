@@ -1,0 +1,153 @@
+@page "/leaves"
+@rendermode InteractiveServer
+@inject HrService HrSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>طلبات الإجازة</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">طلبات الإجازة</h1>
+            <p class="page-subtitle">إدارة طلبات إجازات الموظفين</p>
+        </div>
+        <div class="page-header-actions">
+            <a class="ghost-btn" href="/attendance">⏰ الحضور</a>
+            <button class="primary-btn" @onclick="StartNew">+ طلب جديد</button>
+        </div>
+    </div>
+
+    <div class="stat-grid stat-grid-3">
+        <div class="stat-card stat-orange"><div class="stat-icon">⏳</div><div class="stat-body"><div class="stat-label">معلقة</div><div class="stat-value">@_leaves.Count(l => l.Status == "معلقة")</div></div></div>
+        <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-body"><div class="stat-label">موافق عليها</div><div class="stat-value">@_leaves.Count(l => l.Status == "موافق عليها")</div></div></div>
+        <div class="stat-card stat-red"><div class="stat-icon">❌</div><div class="stat-body"><div class="stat-label">مرفوضة</div><div class="stat-value">@_leaves.Count(l => l.Status == "مرفوضة")</div></div></div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error)) { <div class="error-banner">@_error</div> }
+
+    <div class="panel">
+        <div class="panel-header"><h3>قائمة الطلبات</h3></div>
+        <table class="table-soft striped">
+            <thead><tr><th>الموظف</th><th>النوع</th><th>من</th><th>إلى</th><th>الأيام</th><th>الحالة</th><th>الملاحظات</th><th></th></tr></thead>
+            <tbody>
+                @if (!_leaves.Any())
+                {
+                    <tr><td colspan="8" class="empty">لا توجد طلبات</td></tr>
+                }
+                @foreach (var l in _leaves)
+                {
+                    <tr>
+                        <td>@(l.Employee?.Name ?? "—")</td>
+                        <td>@l.Type</td>
+                        <td>@l.From.ToString("yyyy-MM-dd")</td>
+                        <td>@l.To.ToString("yyyy-MM-dd")</td>
+                        <td>@((l.To - l.From).Days + 1)</td>
+                        <td>
+                            @if (l.Status == "موافق عليها") { <span class="tag tag-success">موافق عليها</span> }
+                            else if (l.Status == "مرفوضة") { <span class="tag tag-danger">مرفوضة</span> }
+                            else { <span class="tag tag-warning">معلقة</span> }
+                        </td>
+                        <td class="muted">@l.Notes</td>
+                        <td>
+                            @if (Auth.HasRole(UserRole.Admin) && l.Status == "معلقة")
+                            {
+                                <button class="link" @onclick="() => Approve(l.Id)">موافقة</button>
+                                <button class="link danger" @onclick="() => Reject(l.Id)">رفض</button>
+                            }
+                            @if (Auth.HasRole(UserRole.Admin))
+                            {
+                                <button class="link danger" @onclick="() => Delete(l.Id)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="Cancel">
+            <div class="modal" @onclick:stopPropagation="true">
+                <h3>طلب إجازة جديد</h3>
+                <EditForm Model="_editing" OnValidSubmit="Save">
+                    <div class="form-grid">
+                        <label>الموظف
+                            <select class="input" @bind="_editing.EmployeeId">
+                                @foreach (var e in _employees) { <option value="@e.Id">@e.Name</option> }
+                            </select>
+                        </label>
+                        <label>النوع
+                            <select class="input" @bind="_editing.Type">
+                                <option>سنوية</option><option>مرضية</option><option>طارئة</option><option>بدون راتب</option>
+                            </select>
+                        </label>
+                        <label>من<input class="input" type="date" @bind="_editing.From" /></label>
+                        <label>إلى<input class="input" type="date" @bind="_editing.To" /></label>
+                        <label class="full">الملاحظات<input class="input" @bind="_editing.Notes" /></label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="ghost-btn" @onclick="Cancel">إلغاء</button>
+                        <button type="submit" class="primary-btn">حفظ</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<LeaveRequest> _leaves = new();
+    private List<Employee> _employees = new();
+    private LeaveRequest? _editing;
+    private string _error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _employees = await HrSvc.GetEmployeesAsync();
+        await Refresh();
+    }
+
+    private async Task Refresh() => _leaves = await HrSvc.GetLeavesAsync();
+
+    private void StartNew() => _editing = new LeaveRequest { From = DateTime.Today, To = DateTime.Today.AddDays(1), EmployeeId = _employees.FirstOrDefault()?.Id ?? 0 };
+    private void Cancel() { _editing = null; _error = ""; }
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        try
+        {
+            await HrSvc.SaveLeaveAsync(_editing);
+            await Audit.LogAsync("طلب إجازة", "الموظفين", $"EmpId={_editing.EmployeeId} - {_editing.Type}");
+            _editing = null;
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+
+    private Task Approve(int id) => SetStatus(id, "موافق عليها");
+    private Task Reject(int id) => SetStatus(id, "مرفوضة");
+
+    private async Task SetStatus(int id, string status)
+    {
+        try
+        {
+            await HrSvc.SetLeaveStatusAsync(id, status);
+            await Audit.LogAsync("تحديث طلب إجازة", "الموظفين", $"ID={id} -> {status}");
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            await HrSvc.DeleteLeaveAsync(id);
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; }
+    }
+}

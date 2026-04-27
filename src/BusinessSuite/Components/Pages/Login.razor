@@ -1,0 +1,56 @@
+@inject AuthService Auth
+
+<div class="login-shell">
+    <div class="login-card">
+        <div class="login-brand">
+            <div class="brand-logo big">🌿</div>
+            <h1>النظام المتكامل لإدارة الأعمال</h1>
+            <p>سجّل دخولك للمتابعة</p>
+        </div>
+
+        <EditForm Model="this" OnValidSubmit="DoLogin" class="login-form">
+            <label>اسم المستخدم</label>
+            <input @bind="Username" placeholder="admin" autofocus />
+
+            <label>كلمة المرور</label>
+            <input type="password" @bind="Password" placeholder="••••••" />
+
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="login-error">@Error</div>
+            }
+
+            <button type="submit" class="btn-primary login-btn" disabled="@_busy">
+                @(_busy ? "جاري التحقق..." : "دخول")
+            </button>
+        </EditForm>
+
+        <div class="login-hint">
+            <strong>حسابات تجريبية:</strong>
+            <div>المدير: <code>admin / admin</code></div>
+            <div>المحاسب: <code>accountant / accountant</code></div>
+            <div>الكاشير: <code>cashier / cashier</code></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnLoggedIn { get; set; }
+    private string Username { get; set; } = "";
+    private string Password { get; set; } = "";
+    private string? Error;
+    private bool _busy;
+
+    private async Task DoLogin()
+    {
+        Error = null;
+        _busy = true;
+        try
+        {
+            var ok = await Auth.LoginAsync(Username.Trim(), Password);
+            if (!ok) Error = "بيانات الدخول غير صحيحة";
+            else await OnLoggedIn.InvokeAsync();
+        }
+        finally { _busy = false; }
+    }
+}
