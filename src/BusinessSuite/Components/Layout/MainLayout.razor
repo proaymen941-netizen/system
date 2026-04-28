@@ -2,6 +2,7 @@
 @inject AuthService Auth
 @inject NotificationService Notifications
 @inject NavigationManager Nav
+@inject SessionService SessionSvc
 @implements IDisposable
 
 @if (!Auth.IsAuthenticated)
@@ -121,8 +122,12 @@ else
         StateHasChanged();
     }
 
-    private void DoLogout()
+    private async Task DoLogout()
     {
+        if (Auth.CurrentSessionId.HasValue)
+        {
+            try { await SessionSvc.EndAsync(Auth.CurrentSessionId.Value, "تسجيل خروج"); } catch { }
+        }
         Auth.Logout();
         Nav.NavigateTo("/", forceLoad: false);
     }

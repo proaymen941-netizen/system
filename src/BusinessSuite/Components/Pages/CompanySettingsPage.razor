@@ -37,6 +37,18 @@
                     <label>العملة<input class="input" @bind="_settings.Currency" /></label>
                     <label>نسبة الضريبة (%)<input class="input" type="number" step="0.01" min="0" max="100" @bind="_settings.TaxRate" /></label>
                 </div>
+                <div class="panel-header" style="margin-top:.5rem"><h3>بيانات الفرع</h3></div>
+                <div class="form-grid" style="padding:1rem">
+                    <label>رقم الفرع (Branch Code)<input class="input" @bind="_settings.BranchCode" placeholder="مثال: 01" dir="ltr" /></label>
+                    <label>السنة المالية (Financial Year)<input class="input" @bind="_settings.FinancialYear" placeholder="2026" dir="ltr" /></label>
+                    <label>اسم الفرع بالعربي (Arabic Name)<input class="input" @bind="_settings.ArabicName" /></label>
+                    <label>اسم الفرع بالأجنبي (Foreign Name)<input class="input" @bind="_settings.ForeignName" dir="ltr" /></label>
+                    <label class="full">عنوان الفرع بالعربي (Arabic Address)<input class="input" @bind="_settings.ArabicAddress" /></label>
+                    <label class="full">عنوان الفرع بالأجنبي (Foreign Address)<input class="input" @bind="_settings.ForeignAddress" dir="ltr" /></label>
+                    <label>رقم الفاكس (Fax No.)<input class="input" @bind="_settings.Fax" dir="ltr" /></label>
+                    <label>صندوق البريد (P.O. Box)<input class="input" @bind="_settings.PoBox" dir="ltr" /></label>
+                    <label class="full">الموقع على الإنترنت (Internet Location)<input class="input" @bind="_settings.Website" placeholder="https://" dir="ltr" /></label>
+                </div>
                 <div class="panel-header" style="margin-top:.5rem"><h3>إعدادات الإيصال الحراري</h3></div>
                 <div class="form-grid" style="padding:1rem">
                     <label class="full">رأس الإيصال (ترحيب)
@@ -126,6 +138,15 @@
             OrderTypeLocal = s.OrderTypeLocal,
             OrderTypeTakeaway = s.OrderTypeTakeaway,
             OrderTypeDelivery = s.OrderTypeDelivery,
+            BranchCode = s.BranchCode,
+            ArabicName = s.ArabicName,
+            ForeignName = s.ForeignName,
+            ArabicAddress = s.ArabicAddress,
+            ForeignAddress = s.ForeignAddress,
+            FinancialYear = s.FinancialYear,
+            Fax = s.Fax,
+            PoBox = s.PoBox,
+            Website = s.Website,
         };
     }
 

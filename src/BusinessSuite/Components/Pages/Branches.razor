@@ -1,0 +1,317 @@
+@page "/branches"
+@using BusinessSuite.Data.Models
+@using BusinessSuite.Services
+@inject BranchService BranchSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>الفروع</PageTitle>
+
+@if (!Auth.IsAuthenticated)
+{
+    <div class="alert alert-warning">يجب تسجيل الدخول لعرض الفروع.</div>
+}
+else
+{
+        <div class="page-header">
+            <div>
+                <h2>🏛️ بيانات الفروع</h2>
+                <p class="text-muted">إدارة فروع المنشأة (متعددة الفروع)</p>
+            </div>
+            @if (Auth.HasRole(UserRole.Admin))
+            {
+                <button class="btn btn-primary" @onclick="OpenCreate">+ إضافة فرع جديد</button>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <div class="alert @_messageClass">@_message</div>
+        }
+
+        <div class="card mb-3">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>بحث</label>
+                    <input class="form-control" @bind="_search" @bind:event="oninput" placeholder="رقم الفرع أو الاسم أو المدينة..." />
+                </div>
+                <div class="form-group">
+                    <label>عرض</label>
+                    <select class="form-control" @bind="_filterActive">
+                        <option value="">كل الفروع</option>
+                        <option value="active">النشطة فقط</option>
+                    </select>
+                </div>
+                <div class="form-group d-flex align-items-end">
+                    <button class="btn btn-secondary" @onclick="LoadAsync">تحديث</button>
+                </div>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <p>جاري التحميل...</p>
+        }
+        else if (!Filtered.Any())
+        {
+            <div class="empty-state">
+                <p>لا توجد فروع. أضف الفرع الأول.</p>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>رقم</th>
+                            <th>الاسم بالعربي</th>
+                            <th>الاسم بالأجنبي</th>
+                            <th>المدير</th>
+                            <th>المدينة</th>
+                            <th>الهاتف</th>
+                            <th>السنة المالية</th>
+                            <th>الحالة</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var b in Filtered)
+                        {
+                            <tr>
+                                <td>@b.Code</td>
+                                <td>
+                                    <strong>@b.ArabicName</strong>
+                                    @if (b.IsMain)
+                                    {
+                                        <span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:6px;">رئيسي</span>
+                                    }
+                                </td>
+                                <td>@b.ForeignName</td>
+                                <td>@b.Manager</td>
+                                <td>@b.City</td>
+                                <td>@b.Phone</td>
+                                <td>@b.FinancialYear</td>
+                                <td>
+                                    @if (b.IsActive)
+                                    {
+                                        <span style="background:#0d6efd;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">نشط</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background:#6c757d;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">معطل</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => Edit(b)">تعديل</button>
+                                    @if (Auth.HasRole(UserRole.Admin) && !b.IsMain)
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => SetMain(b.Id)">تعيين رئيسي</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => Delete(b.Id)">حذف</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (_editing != null)
+        {
+            <div class="modal-backdrop" @onclick="CloseEdit"></div>
+            <div class="modal" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <h3>@(_editing.Id == 0 ? "إضافة فرع جديد" : "تعديل بيانات الفرع")</h3>
+                    <button class="btn-close" @onclick="CloseEdit">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>رقم الفرع</label>
+                            <input class="form-control" @bind="_editing.Code" placeholder="01" />
+                        </div>
+                        <div class="form-group">
+                            <label>السنة المالية</label>
+                            <input class="form-control" @bind="_editing.FinancialYear" placeholder="@DateTime.Now.Year" />
+                        </div>
+                        <div class="form-group">
+                            <label>المدير</label>
+                            <input class="form-control" @bind="_editing.Manager" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>اسم الفرع بالعربي *</label>
+                            <input class="form-control" @bind="_editing.ArabicName" />
+                        </div>
+                        <div class="form-group">
+                            <label>اسم الفرع بالأجنبي</label>
+                            <input class="form-control" @bind="_editing.ForeignName" dir="ltr" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>العنوان بالعربي</label>
+                            <input class="form-control" @bind="_editing.ArabicAddress" />
+                        </div>
+                        <div class="form-group">
+                            <label>العنوان بالأجنبي</label>
+                            <input class="form-control" @bind="_editing.ForeignAddress" dir="ltr" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>المدينة</label>
+                            <input class="form-control" @bind="_editing.City" />
+                        </div>
+                        <div class="form-group">
+                            <label>المنطقة</label>
+                            <input class="form-control" @bind="_editing.Region" />
+                        </div>
+                        <div class="form-group">
+                            <label>الدولة</label>
+                            <input class="form-control" @bind="_editing.Country" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الهاتف</label>
+                            <input class="form-control" @bind="_editing.Phone" />
+                        </div>
+                        <div class="form-group">
+                            <label>الفاكس</label>
+                            <input class="form-control" @bind="_editing.Fax" />
+                        </div>
+                        <div class="form-group">
+                            <label>صندوق البريد</label>
+                            <input class="form-control" @bind="_editing.PoBox" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>البريد الإلكتروني</label>
+                            <input class="form-control" @bind="_editing.Email" dir="ltr" />
+                        </div>
+                        <div class="form-group">
+                            <label>الموقع الإلكتروني</label>
+                            <input class="form-control" @bind="_editing.Website" dir="ltr" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الرقم الضريبي</label>
+                            <input class="form-control" @bind="_editing.TaxNumber" />
+                        </div>
+                        <div class="form-group">
+                            <label>السجل التجاري</label>
+                            <input class="form-control" @bind="_editing.CommercialRegister" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label>ملاحظات</label>
+                            <textarea class="form-control" @bind="_editing.Notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-check">
+                                <input type="checkbox" @bind="_editing.IsActive" /> نشط
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @onclick="Save" disabled="@_saving">@(_saving ? "جاري الحفظ..." : "حفظ")</button>
+                    <button class="btn btn-secondary" @onclick="CloseEdit">إلغاء</button>
+                </div>
+            </div>
+        }
+}
+
+@code {
+    private List<Branch> _items = new();
+    private Branch? _editing;
+    private bool _loading = true;
+    private bool _saving;
+    private string _search = "";
+    private string _filterActive = "";
+    private string _message = "";
+    private string _messageClass = "alert-info";
+
+    private IEnumerable<Branch> Filtered => _items.Where(b =>
+    {
+        if (_filterActive == "active" && !b.IsActive) return false;
+        if (string.IsNullOrWhiteSpace(_search)) return true;
+        var s = _search.Trim();
+        return b.ArabicName.Contains(s) || b.ForeignName.Contains(s) ||
+               b.Code.Contains(s) || b.City.Contains(s);
+    });
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try { _items = await BranchSvc.GetAsync(); }
+        finally { _loading = false; }
+    }
+
+    private void OpenCreate() => _editing = new Branch { FinancialYear = DateTime.Now.Year.ToString(), IsActive = true };
+    private void Edit(Branch b) => _editing = new Branch
+    {
+        Id = b.Id, Code = b.Code, ArabicName = b.ArabicName, ForeignName = b.ForeignName,
+        FinancialYear = b.FinancialYear, IsMain = b.IsMain, IsActive = b.IsActive,
+        ArabicAddress = b.ArabicAddress, ForeignAddress = b.ForeignAddress,
+        Phone = b.Phone, Fax = b.Fax, PoBox = b.PoBox, Email = b.Email, Website = b.Website,
+        City = b.City, Region = b.Region, Country = b.Country,
+        Manager = b.Manager, TaxNumber = b.TaxNumber, CommercialRegister = b.CommercialRegister,
+        Notes = b.Notes
+    };
+    private void CloseEdit() => _editing = null;
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        _saving = true;
+        try
+        {
+            var isNew = _editing.Id == 0;
+            await BranchSvc.SaveAsync(_editing);
+            await Audit.LogAsync(isNew ? "إضافة فرع" : "تعديل فرع", "الفروع",
+                $"الفرع {_editing.Code} - {_editing.ArabicName}");
+            ShowMessage($"تم حفظ الفرع \"{_editing.ArabicName}\" بنجاح", "alert-success");
+            _editing = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowMessage(ex.Message, "alert-danger"); }
+        finally { _saving = false; }
+    }
+
+    private async Task SetMain(int id)
+    {
+        try
+        {
+            await BranchSvc.SetMainAsync(id);
+            await Audit.LogAsync("تعيين فرع رئيسي", "الفروع", $"الفرع #{id}");
+            ShowMessage("تم تعيين الفرع كفرع رئيسي", "alert-success");
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowMessage(ex.Message, "alert-danger"); }
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            await BranchSvc.DeleteAsync(id);
+            await Audit.LogAsync("حذف فرع", "الفروع", $"الفرع #{id}");
+            ShowMessage("تم حذف الفرع", "alert-success");
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowMessage(ex.Message, "alert-danger"); }
+    }
+
+    private void ShowMessage(string m, string cls) { _message = m; _messageClass = cls; }
+}

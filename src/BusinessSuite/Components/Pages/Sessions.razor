@@ -1,0 +1,217 @@
+@page "/sessions"
+@using BusinessSuite.Data.Models
+@using BusinessSuite.Services
+@inject SessionService SessionSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>جلسات المستخدمين</PageTitle>
+
+@if (!Auth.IsAuthenticated || !Auth.HasRole(UserRole.Admin))
+{
+    <div class="alert alert-warning">صفحة الجلسات متاحة للمدير ومدير النظام فقط.</div>
+}
+else
+{
+        <div class="page-header">
+            <div>
+                <h2>🟢 إدارة جلسات المستخدمين والصلاحيات</h2>
+                <p class="text-muted">عرض المستخدمين النشطين حالياً وسجل الدخول والخروج</p>
+            </div>
+            <div>
+                <button class="btn btn-secondary" @onclick="LoadAsync">تحديث</button>
+                @if (Auth.HasRole(UserRole.Admin))
+                {
+                    <button class="btn btn-danger" @onclick="EndAll">إنهاء كل الجلسات</button>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <div class="alert @_messageClass">@_message</div>
+        }
+
+        <div class="stats-grid mb-3">
+            <div class="stat-card stat-green">
+                <h4>الجلسات النشطة</h4>
+                <p class="stat-value">@_active.Count</p>
+            </div>
+            <div class="stat-card stat-blue">
+                <h4>عدد الأجهزة المرتبطة</h4>
+                <p class="stat-value">@_active.Select(s => s.DeviceName).Distinct().Count()</p>
+            </div>
+            <div class="stat-card stat-purple">
+                <h4>عمليات اليوم</h4>
+                <p class="stat-value">@_history.Count(h => h.LoginAt.Date == DateTime.Today)</p>
+            </div>
+        </div>
+
+        <ul class="nav-tabs">
+            <li class="@(_tab == "active" ? "active" : "")" @onclick='() => _tab = "active"'>المستخدمون النشطون (@_active.Count)</li>
+            <li class="@(_tab == "history" ? "active" : "")" @onclick='() => _tab = "history"'>سجل الجلسات</li>
+        </ul>
+
+        @if (_tab == "active")
+        {
+            <div class="card">
+                <h3>حالة دخول</h3>
+                @if (!_active.Any())
+                {
+                    <div class="empty-state">
+                        <p>لا يوجد مستخدمون متصلون حالياً.</p>
+                    </div>
+                }
+                else
+                {
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الحالة</th>
+                                <th>رقم المستخدم</th>
+                                <th>اسم المستخدم</th>
+                                <th>اسم النظام</th>
+                                <th>تاريخ الدخول</th>
+                                <th>اسم الجهاز</th>
+                                <th>الفرع</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ int i = 1; }
+                            @foreach (var s in _active)
+                            {
+                                <tr>
+                                    <td>@(i++)</td>
+                                    <td><span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">دخول</span></td>
+                                    <td>@s.UserId</td>
+                                    <td>@s.Username</td>
+                                    <td>@s.FullName</td>
+                                    <td>@s.LoginAt.ToString("yyyy/MM/dd HH:mm:ss")</td>
+                                    <td>@s.DeviceName</td>
+                                    <td>@s.BranchCode</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="card mb-3">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>من تاريخ</label>
+                        <input type="date" class="form-control" @bind="_from" />
+                    </div>
+                    <div class="form-group">
+                        <label>إلى تاريخ</label>
+                        <input type="date" class="form-control" @bind="_to" />
+                    </div>
+                    <div class="form-group d-flex align-items-end">
+                        <button class="btn btn-secondary" @onclick="LoadAsync">تطبيق</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>سجل آخر الجلسات</h3>
+                @if (!_history.Any())
+                {
+                    <div class="empty-state">
+                        <p>لا توجد سجلات جلسات في الفترة المحددة.</p>
+                    </div>
+                }
+                else
+                {
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>الحالة</th>
+                                <th>اسم المستخدم</th>
+                                <th>اسم النظام</th>
+                                <th>التاريخ</th>
+                                <th>اللغة</th>
+                                <th>اسم الجهاز</th>
+                                <th>رقم الفرع</th>
+                                <th>المدة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ int j = 1; }
+                            @foreach (var s in _history)
+                            {
+                                <tr>
+                                    <td>@(j++)</td>
+                                    <td>
+                                        @if (s.IsActive)
+                                        {
+                                            <span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">دخول</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="background:#fd7e14;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">خروج</span>
+                                        }
+                                    </td>
+                                    <td>@s.Username</td>
+                                    <td>@s.FullName</td>
+                                    <td>@s.LoginAt.ToString("yyyy/MM/dd HH:mm:ss")</td>
+                                    <td>@s.Language</td>
+                                    <td>@s.DeviceName</td>
+                                    <td>@s.BranchCode</td>
+                                    <td>@FormatDuration(s)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        }
+}
+
+@code {
+    private List<UserSession> _active = new();
+    private List<UserSession> _history = new();
+    private string _tab = "active";
+    private DateTime _from = DateTime.Today.AddDays(-30);
+    private DateTime _to = DateTime.Today;
+    private string _message = "";
+    private string _messageClass = "alert-info";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _active = await SessionSvc.GetActiveAsync();
+        _history = await SessionSvc.GetHistoryAsync(300, null, _from, _to);
+    }
+
+    private async Task EndAll()
+    {
+        try
+        {
+            await SessionSvc.EndAllAsync("إنهاء بواسطة المدير");
+            await Audit.LogAsync("إنهاء كل الجلسات", "الجلسات", "تم إنهاء كل الجلسات النشطة");
+            _message = "تم إنهاء كل الجلسات النشطة";
+            _messageClass = "alert-success";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _message = ex.Message;
+            _messageClass = "alert-danger";
+        }
+    }
+
+    private string FormatDuration(UserSession s)
+    {
+        var end = s.LogoutAt ?? DateTime.Now;
+        var d = end - s.LoginAt;
+        if (d.TotalMinutes < 1) return $"{(int)d.TotalSeconds} ث";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes} د";
+        if (d.TotalDays < 1) return $"{d.Hours} س {d.Minutes} د";
+        return $"{(int)d.TotalDays} يوم";
+    }
+}

@@ -1,0 +1,254 @@
+@page "/currencies"
+@rendermode InteractiveServer
+@inject CurrencyService CurrencySvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>إدارة العملات</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">نظام العملات</h1>
+            <p class="page-subtitle">العملات المحلية والأجنبية وأسعار الصرف</p>
+        </div>
+        <div class="page-header-actions">
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+            {
+                <button class="primary-btn" @onclick="StartNew">+ عملة جديدة</button>
+            }
+        </div>
+    </div>
+
+    <div class="stat-grid stat-grid-3">
+        <div class="stat-card stat-blue">
+            <div class="stat-icon">💱</div>
+            <div class="stat-body">
+                <div class="stat-label">إجمالي العملات</div>
+                <div class="stat-value">@_currencies.Count</div>
+            </div>
+        </div>
+        <div class="stat-card stat-green">
+            <div class="stat-icon">🏠</div>
+            <div class="stat-body">
+                <div class="stat-label">العملة الأساسية</div>
+                <div class="stat-value" style="font-size:1.25rem">
+                    @(_base?.Name ?? "—") <span class="muted">@(_base?.Symbol ?? "")</span>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card stat-purple">
+            <div class="stat-icon">🌍</div>
+            <div class="stat-body">
+                <div class="stat-label">العملات الأجنبية</div>
+                <div class="stat-value">@_currencies.Count(c => c.Kind == CurrencyKind.Foreign)</div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_message)) { <div class="success-banner">@_message</div> }
+    @if (!string.IsNullOrEmpty(_error)) { <div class="error-banner">@_error</div> }
+
+    <div class="panel">
+        <div class="panel-header"><h3>قائمة العملات</h3></div>
+        <table class="table-soft striped">
+            <thead>
+                <tr>
+                    <th>الرمز</th>
+                    <th>اسم العملة</th>
+                    <th>البلد</th>
+                    <th>الإشارة</th>
+                    <th>النوع</th>
+                    <th>سعر الصرف</th>
+                    <th>الحالة</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!_currencies.Any())
+                {
+                    <tr><td colspan="8" class="empty">لا توجد عملات مسجلة</td></tr>
+                }
+                @foreach (var c in _currencies)
+                {
+                    <tr>
+                        <td dir="ltr"><strong>@c.Code</strong></td>
+                        <td>
+                            @c.Name
+                            @if (c.IsBase)
+                            {
+                                <span style="margin-inline-start:.4rem;background:rgba(16,185,129,.15);color:#10b981;padding:2px 8px;border-radius:8px;font-size:.78rem">أساسية</span>
+                            }
+                        </td>
+                        <td>@c.Country</td>
+                        <td dir="ltr">@c.Symbol</td>
+                        <td>
+                            @if (c.Kind == CurrencyKind.Local)
+                            {
+                                <span style="background:rgba(59,130,246,.15);color:#3b82f6;padding:2px 8px;border-radius:8px;font-size:.78rem">محلية</span>
+                            }
+                            else
+                            {
+                                <span style="background:rgba(249,115,22,.15);color:#f97316;padding:2px 8px;border-radius:8px;font-size:.78rem">أجنبية</span>
+                            }
+                        </td>
+                        <td dir="ltr">@c.ExchangeRate.ToString("N4")</td>
+                        <td>
+                            @if (c.IsActive)
+                            {
+                                <span style="background:rgba(16,185,129,.15);color:#10b981;padding:2px 8px;border-radius:8px;font-size:.78rem">مفعّلة</span>
+                            }
+                            else
+                            {
+                                <span style="background:rgba(148,163,184,.15);color:#94a3b8;padding:2px 8px;border-radius:8px;font-size:.78rem">معطّلة</span>
+                            }
+                        </td>
+                        <td>
+                            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+                            {
+                                <button class="link" @onclick="() => Edit(c)">تعديل</button>
+                            }
+                            @if (Auth.HasRole(UserRole.Admin) && !c.IsBase)
+                            {
+                                <button class="link" @onclick="() => MakeBase(c.Id)">تعيين كأساسية</button>
+                                <button class="link danger" @onclick="() => Delete(c.Id)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="Cancel">
+            <div class="modal" @onclick:stopPropagation="true">
+                <h3>@(_editing.Id == 0 ? "إضافة عملة جديدة" : "تعديل عملة")</h3>
+                @if (!string.IsNullOrEmpty(_dialogError)) { <div class="error-banner">@_dialogError</div> }
+                <EditForm Model="_editing" OnValidSubmit="Save">
+                    <div class="form-grid">
+                        <label>اسم العملة<input class="input" @bind="_editing.Name" required placeholder="مثال: ريال سعودي" /></label>
+                        <label>رمز العملة<input class="input" @bind="_editing.Code" placeholder="SAR" dir="ltr" /></label>
+                        <label>البلد<input class="input" @bind="_editing.Country" placeholder="المملكة العربية السعودية" /></label>
+                        <label>الإشارة<input class="input" @bind="_editing.Symbol" placeholder="ر.س" dir="ltr" /></label>
+                        <label>نوع العملة
+                            <select class="input" @bind="_editing.Kind" disabled="@_editing.IsBase">
+                                <option value="@CurrencyKind.Local">عملة محلية</option>
+                                <option value="@CurrencyKind.Foreign">عملة أجنبية</option>
+                            </select>
+                        </label>
+                        <label>سعر الصرف (مقابل العملة الأساسية)
+                            <input class="input" type="number" step="0.0001" min="0" @bind="_editing.ExchangeRate" disabled="@_editing.IsBase" />
+                        </label>
+                        <label class="full">ملاحظات
+                            <input class="input" @bind="_editing.Notes" />
+                        </label>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                            <input type="checkbox" @bind="_editing.IsActive" disabled="@_editing.IsBase" />
+                            عملة مفعّلة
+                        </label>
+                        @if (_editing.IsBase)
+                        {
+                            <div class="muted full">
+                                ℹ️ هذه هي العملة الأساسية للنظام — النوع محلي وسعر الصرف 1 ولا يمكن تعطيلها.
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="ghost-btn" @onclick="Cancel">إلغاء</button>
+                        <button type="submit" class="primary-btn">حفظ</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Currency> _currencies = new();
+    private Currency? _base;
+    private Currency? _editing;
+    private string _message = "";
+    private string _error = "";
+    private string _dialogError = "";
+
+    protected override async Task OnInitializedAsync() => await Refresh();
+
+    private async Task Refresh()
+    {
+        _currencies = await CurrencySvc.GetAsync();
+        _base = _currencies.FirstOrDefault(c => c.IsBase) ?? _currencies.FirstOrDefault();
+    }
+
+    private void StartNew()
+    {
+        _dialogError = "";
+        _editing = new Currency { Kind = CurrencyKind.Foreign, ExchangeRate = 1m, IsActive = true };
+    }
+
+    private void Edit(Currency c)
+    {
+        _dialogError = "";
+        _editing = new Currency
+        {
+            Id = c.Id,
+            Code = c.Code,
+            Name = c.Name,
+            Country = c.Country,
+            Symbol = c.Symbol,
+            Kind = c.Kind,
+            ExchangeRate = c.ExchangeRate,
+            IsActive = c.IsActive,
+            IsBase = c.IsBase,
+            Notes = c.Notes,
+        };
+    }
+
+    private void Cancel() { _editing = null; _dialogError = ""; }
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        try
+        {
+            var isNew = _editing.Id == 0;
+            await CurrencySvc.SaveAsync(_editing);
+            await Audit.LogAsync(isNew ? "إضافة عملة" : "تعديل عملة", "العملات", $"{_editing.Code} - {_editing.Name}");
+            _message = isNew ? "✅ تم إضافة العملة" : "✅ تم تحديث العملة";
+            _error = "";
+            _editing = null;
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _dialogError = ex.Message; }
+        catch (InvalidOperationException ex) { _dialogError = ex.Message; }
+    }
+
+    private async Task MakeBase(int id)
+    {
+        try
+        {
+            await CurrencySvc.SetBaseAsync(id);
+            await Audit.LogAsync("تعيين عملة أساسية", "العملات", $"ID={id}");
+            _message = "✅ تم تعيين العملة الأساسية";
+            _error = "";
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; _message = ""; }
+        catch (InvalidOperationException ex) { _error = ex.Message; _message = ""; }
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            await CurrencySvc.DeleteAsync(id);
+            await Audit.LogAsync("حذف عملة", "العملات", $"ID={id}");
+            _message = "✅ تم حذف العملة";
+            _error = "";
+            await Refresh();
+        }
+        catch (AuthorizationException ex) { _error = ex.Message; _message = ""; }
+        catch (InvalidOperationException ex) { _error = ex.Message; _message = ""; }
+    }
+}

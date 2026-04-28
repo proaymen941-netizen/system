@@ -1,5 +1,6 @@
 @inject AuthService Auth
 @inject LicenseService LicenseSvc
+@inject SessionService SessionSvc
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -135,6 +136,16 @@
                     return;
                 }
             }
+
+            // Step 3: open user session record
+            try
+            {
+                var deviceName = await JS.InvokeAsync<string>("deviceFingerprint.getDeviceName");
+                var sid = await SessionSvc.StartAsync(Auth.CurrentUser!, deviceName ?? "متصفح", "", "01", "عربي");
+                Auth.CurrentSessionId = sid;
+                Auth.CurrentDevice = deviceName ?? "متصفح";
+            }
+            catch { }
 
             await OnLoggedIn.InvokeAsync();
         }

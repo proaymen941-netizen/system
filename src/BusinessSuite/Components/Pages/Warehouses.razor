@@ -1,0 +1,331 @@
+@page "/warehouses"
+@using BusinessSuite.Data.Models
+@using BusinessSuite.Services
+@inject WarehouseService WarehouseSvc
+@inject BranchService BranchSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>المخازن</PageTitle>
+
+@if (!Auth.IsAuthenticated)
+{
+    <div class="alert alert-warning">يجب تسجيل الدخول لعرض المخازن.</div>
+}
+else
+{
+        <div class="page-header">
+            <div>
+                <h2>🏬 بيانات المخازن</h2>
+                <p class="text-muted">إدارة مخازن المنشأة (متعدد المخازن لكل فرع)</p>
+            </div>
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+            {
+                <button class="btn btn-primary" @onclick="OpenCreate">+ إضافة مخزن جديد</button>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <div class="alert @_messageClass">@_message</div>
+        }
+
+        <div class="card mb-3">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>بحث</label>
+                    <input class="form-control" @bind="_search" @bind:event="oninput" placeholder="رقم المخزن، الاسم، المدينة، الأمين..." />
+                </div>
+                <div class="form-group">
+                    <label>الفرع</label>
+                    <select class="form-control" @bind="_filterBranch">
+                        <option value="0">كل الفروع</option>
+                        @foreach (var b in _branches)
+                        {
+                            <option value="@b.Id">@b.ArabicName</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group d-flex align-items-end">
+                    <button class="btn btn-secondary" @onclick="LoadAsync">تحديث</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid mb-3">
+            <div class="stat-card stat-blue">
+                <h4>إجمالي المخازن</h4>
+                <p class="stat-value">@_items.Count</p>
+            </div>
+            <div class="stat-card stat-green">
+                <h4>المخازن النشطة</h4>
+                <p class="stat-value">@_items.Count(w => w.IsActive)</p>
+            </div>
+            <div class="stat-card stat-purple">
+                <h4>إجمالي الفروع</h4>
+                <p class="stat-value">@_branches.Count</p>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <p>جاري التحميل...</p>
+        }
+        else if (!Filtered.Any())
+        {
+            <div class="empty-state">
+                <p>لا توجد مخازن. أضف المخزن الأول.</p>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>رقم</th>
+                            <th>اسم المخزن</th>
+                            <th>الاسم الأجنبي</th>
+                            <th>الفرع</th>
+                            <th>النوع</th>
+                            <th>الأمين/المسؤول</th>
+                            <th>المدينة</th>
+                            <th>الحالة</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var w in Filtered)
+                        {
+                            <tr>
+                                <td>@w.Code</td>
+                                <td>
+                                    <strong>@w.Name</strong>
+                                    @if (w.IsMain)
+                                    {
+                                        <span style="background:#198754;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;margin-right:6px;">رئيسي</span>
+                                    }
+                                </td>
+                                <td>@w.ForeignName</td>
+                                <td>@(w.Branch?.ArabicName ?? "—")</td>
+                                <td>@w.WarehouseType</td>
+                                <td>@w.Manager</td>
+                                <td>@w.City</td>
+                                <td>
+                                    @if (w.IsActive)
+                                    {
+                                        <span style="background:#0d6efd;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">نشط</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background:#6c757d;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">معطل</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => Edit(w)">تعديل</button>
+                                    @if (Auth.HasRole(UserRole.Admin) && !w.IsMain)
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => SetMain(w.Id)">رئيسي</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => Delete(w.Id)">حذف</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (_editing != null)
+        {
+            <div class="modal-backdrop" @onclick="CloseEdit"></div>
+            <div class="modal" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <h3>@(_editing.Id == 0 ? "إضافة مخزن جديد" : "تعديل بيانات المخزن")</h3>
+                    <button class="btn-close" @onclick="CloseEdit">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>رقم المخزن</label>
+                            <input class="form-control" @bind="_editing.Code" placeholder="01" />
+                        </div>
+                        <div class="form-group">
+                            <label>اسم المخزن *</label>
+                            <input class="form-control" @bind="_editing.Name" />
+                        </div>
+                        <div class="form-group">
+                            <label>الاسم بالأجنبي</label>
+                            <input class="form-control" @bind="_editing.ForeignName" dir="ltr" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الفرع</label>
+                            <select class="form-control" @bind="_editing.BranchId">
+                                <option value="">— لا يوجد —</option>
+                                @foreach (var b in _branches)
+                                {
+                                    <option value="@b.Id">@b.ArabicName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>نوع المخزن</label>
+                            <select class="form-control" @bind="_editing.WarehouseType">
+                                <option value="رئيسي">رئيسي</option>
+                                <option value="فرعي">فرعي</option>
+                                <option value="عرض">عرض</option>
+                                <option value="تالف">مرتجعات/تالف</option>
+                                <option value="عبور">عبور</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>الأمين/المسؤول</label>
+                            <input class="form-control" @bind="_editing.Manager" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الهاتف</label>
+                            <input class="form-control" @bind="_editing.Phone" />
+                        </div>
+                        <div class="form-group">
+                            <label>المدينة</label>
+                            <input class="form-control" @bind="_editing.City" />
+                        </div>
+                        <div class="form-group">
+                            <label>المنطقة</label>
+                            <input class="form-control" @bind="_editing.Region" />
+                        </div>
+                        <div class="form-group">
+                            <label>الدولة</label>
+                            <input class="form-control" @bind="_editing.Country" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label>العنوان</label>
+                            <input class="form-control" @bind="_editing.Address" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label>ملاحظات</label>
+                            <textarea class="form-control" @bind="_editing.Notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-check">
+                                <input type="checkbox" @bind="_editing.IsActive" /> نشط
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-check">
+                                <input type="checkbox" @bind="_editing.AllowNegativeStock" /> السماح بالرصيد السالب
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @onclick="Save" disabled="@_saving">@(_saving ? "جاري الحفظ..." : "حفظ")</button>
+                    <button class="btn btn-secondary" @onclick="CloseEdit">إلغاء</button>
+                </div>
+            </div>
+        }
+}
+
+@code {
+    private List<Warehouse> _items = new();
+    private List<Branch> _branches = new();
+    private Warehouse? _editing;
+    private bool _loading = true;
+    private bool _saving;
+    private string _search = "";
+    private int _filterBranch = 0;
+    private string _message = "";
+    private string _messageClass = "alert-info";
+
+    private IEnumerable<Warehouse> Filtered => _items.Where(w =>
+    {
+        if (_filterBranch != 0 && w.BranchId != _filterBranch) return false;
+        if (string.IsNullOrWhiteSpace(_search)) return true;
+        var s = _search.Trim();
+        return w.Name.Contains(s) || w.ForeignName.Contains(s) ||
+               w.Code.Contains(s) || w.City.Contains(s) || w.Manager.Contains(s);
+    });
+
+    protected override async Task OnInitializedAsync()
+    {
+        _branches = await BranchSvc.GetAsync(activeOnly: true);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try { _items = await WarehouseSvc.GetAsync(); }
+        finally { _loading = false; }
+    }
+
+    private void OpenCreate()
+    {
+        var main = _branches.FirstOrDefault(b => b.IsMain) ?? _branches.FirstOrDefault();
+        _editing = new Warehouse { IsActive = true, BranchId = main?.Id, WarehouseType = "رئيسي", Country = "المملكة العربية السعودية" };
+    }
+
+    private void Edit(Warehouse w) => _editing = new Warehouse
+    {
+        Id = w.Id, Code = w.Code, Name = w.Name, ForeignName = w.ForeignName,
+        BranchId = w.BranchId, IsMain = w.IsMain, IsActive = w.IsActive,
+        AllowNegativeStock = w.AllowNegativeStock, Manager = w.Manager,
+        Phone = w.Phone, Address = w.Address, City = w.City, Region = w.Region,
+        Country = w.Country, WarehouseType = w.WarehouseType, Notes = w.Notes
+    };
+    private void CloseEdit() => _editing = null;
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        _saving = true;
+        try
+        {
+            var isNew = _editing.Id == 0;
+            await WarehouseSvc.SaveAsync(_editing);
+            await Audit.LogAsync(isNew ? "إضافة مخزن" : "تعديل مخزن", "المخازن",
+                $"المخزن {_editing.Code} - {_editing.Name}");
+            ShowMessage($"تم حفظ المخزن \"{_editing.Name}\" بنجاح", "alert-success");
+            _editing = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowMessage(ex.Message, "alert-danger"); }
+        finally { _saving = false; }
+    }
+
+    private async Task SetMain(int id)
+    {
+        try
+        {
+            await WarehouseSvc.SetMainAsync(id);
+            await Audit.LogAsync("تعيين مخزن رئيسي", "المخازن", $"المخزن #{id}");
+            ShowMessage("تم تعيين المخزن كمخزن رئيسي", "alert-success");
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowMessage(ex.Message, "alert-danger"); }
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            await WarehouseSvc.DeleteAsync(id);
+            await Audit.LogAsync("حذف مخزن", "المخازن", $"المخزن #{id}");
+            ShowMessage("تم حذف المخزن", "alert-success");
+            await LoadAsync();
+        }
+        catch (Exception ex) { ShowMessage(ex.Message, "alert-danger"); }
+    }
+
+    private void ShowMessage(string m, string cls) { _message = m; _messageClass = cls; }
+}
