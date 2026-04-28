@@ -43,6 +43,10 @@ public class AppDbContext : DbContext
     public DbSet<StockIssueVoucher> StockIssues => Set<StockIssueVoucher>();
     public DbSet<StockIssueItem> StockIssueItems => Set<StockIssueItem>();
     public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -91,5 +95,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RegisteredDevice>().HasIndex(d => d.DeviceFingerprint).IsUnique();
         modelBuilder.Entity<UserPermission>().HasIndex(p => new { p.UserId, p.PermissionKey }).IsUnique();
         modelBuilder.Entity<ChartOfAccount>().HasIndex(c => c.Code).IsUnique();
+
+        modelBuilder.Entity<Currency>().Property(c => c.ExchangeRate).HasConversion<double>();
     }
 }

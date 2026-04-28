@@ -51,4 +51,32 @@ public class CompanySettings
 
     [MaxLength(100)]
     public string OrderTypeDelivery { get; set; } = "توصيل";
+
+    // Branch / multi-language data (compatible with classic ERP branch screen)
+    [MaxLength(20)]
+    public string BranchCode { get; set; } = "";
+
+    [MaxLength(150)]
+    public string ArabicName { get; set; } = "";
+
+    [MaxLength(150)]
+    public string ForeignName { get; set; } = "";
+
+    [MaxLength(250)]
+    public string ArabicAddress { get; set; } = "";
+
+    [MaxLength(250)]
+    public string ForeignAddress { get; set; } = "";
+
+    [MaxLength(20)]
+    public string FinancialYear { get; set; } = "";
+
+    [MaxLength(30)]
+    public string Fax { get; set; } = "";
+
+    [MaxLength(30)]
+    public string PoBox { get; set; } = "";
+
+    [MaxLength(150)]
+    public string Website { get; set; } = "";
 }

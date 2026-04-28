@@ -42,6 +42,16 @@ public static class DbMigrator
         TryAdd(conn, columns, "CompanySettings", "OrderTypeTakeaway", "TEXT NOT NULL DEFAULT 'آمر صرف'");
         TryAdd(conn, columns, "CompanySettings", "OrderTypeDelivery", "TEXT NOT NULL DEFAULT 'توصيل'");
 
+        TryAdd(conn, columns, "CompanySettings", "BranchCode", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "ArabicName", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "ForeignName", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "ArabicAddress", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "ForeignAddress", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "FinancialYear", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "Fax", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "PoBox", "TEXT NOT NULL DEFAULT ''");
+        TryAdd(conn, columns, "CompanySettings", "Website", "TEXT NOT NULL DEFAULT ''");
+
         EnsureTable(conn, "CashierShifts", @"
             CREATE TABLE IF NOT EXISTS ""CashierShifts"" (
                 ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_CashierShifts"" PRIMARY KEY AUTOINCREMENT,
@@ -262,6 +272,87 @@ public static class DbMigrator
                 ""Quantity"" INTEGER NOT NULL DEFAULT 0,
                 ""UnitCost"" REAL NOT NULL DEFAULT 0,
                 ""LineTotal"" REAL NOT NULL DEFAULT 0
+            );");
+
+        EnsureTable(conn, "Branches", @"
+            CREATE TABLE IF NOT EXISTS ""Branches"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Branches"" PRIMARY KEY AUTOINCREMENT,
+                ""Code"" TEXT NOT NULL DEFAULT '',
+                ""ArabicName"" TEXT NOT NULL DEFAULT '',
+                ""ForeignName"" TEXT NOT NULL DEFAULT '',
+                ""FinancialYear"" TEXT NOT NULL DEFAULT '',
+                ""IsMain"" INTEGER NOT NULL DEFAULT 0,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""ArabicAddress"" TEXT NOT NULL DEFAULT '',
+                ""ForeignAddress"" TEXT NOT NULL DEFAULT '',
+                ""Phone"" TEXT NOT NULL DEFAULT '',
+                ""Fax"" TEXT NOT NULL DEFAULT '',
+                ""PoBox"" TEXT NOT NULL DEFAULT '',
+                ""Email"" TEXT NOT NULL DEFAULT '',
+                ""Website"" TEXT NOT NULL DEFAULT '',
+                ""City"" TEXT NOT NULL DEFAULT '',
+                ""Region"" TEXT NOT NULL DEFAULT '',
+                ""Country"" TEXT NOT NULL DEFAULT '',
+                ""Manager"" TEXT NOT NULL DEFAULT '',
+                ""TaxNumber"" TEXT NOT NULL DEFAULT '',
+                ""CommercialRegister"" TEXT NOT NULL DEFAULT '',
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT '',
+                ""UpdatedAt"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "Warehouses", @"
+            CREATE TABLE IF NOT EXISTS ""Warehouses"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Warehouses"" PRIMARY KEY AUTOINCREMENT,
+                ""Code"" TEXT NOT NULL DEFAULT '',
+                ""Name"" TEXT NOT NULL DEFAULT '',
+                ""ForeignName"" TEXT NOT NULL DEFAULT '',
+                ""BranchId"" INTEGER NULL,
+                ""IsMain"" INTEGER NOT NULL DEFAULT 0,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""AllowNegativeStock"" INTEGER NOT NULL DEFAULT 0,
+                ""Manager"" TEXT NOT NULL DEFAULT '',
+                ""Phone"" TEXT NOT NULL DEFAULT '',
+                ""Address"" TEXT NOT NULL DEFAULT '',
+                ""City"" TEXT NOT NULL DEFAULT '',
+                ""Region"" TEXT NOT NULL DEFAULT '',
+                ""Country"" TEXT NOT NULL DEFAULT '',
+                ""WarehouseType"" TEXT NOT NULL DEFAULT 'رئيسي',
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT '',
+                ""UpdatedAt"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "UserSessions", @"
+            CREATE TABLE IF NOT EXISTS ""UserSessions"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_UserSessions"" PRIMARY KEY AUTOINCREMENT,
+                ""UserId"" INTEGER NOT NULL DEFAULT 0,
+                ""Username"" TEXT NOT NULL DEFAULT '',
+                ""FullName"" TEXT NOT NULL DEFAULT '',
+                ""BranchCode"" TEXT NOT NULL DEFAULT '',
+                ""DeviceName"" TEXT NOT NULL DEFAULT '',
+                ""IpAddress"" TEXT NOT NULL DEFAULT '',
+                ""Language"" TEXT NOT NULL DEFAULT 'عربي',
+                ""LoginAt"" TEXT NOT NULL DEFAULT '',
+                ""LogoutAt"" TEXT NULL,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""LogoutReason"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "Currencies", @"
+            CREATE TABLE IF NOT EXISTS ""Currencies"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Currencies"" PRIMARY KEY AUTOINCREMENT,
+                ""Code"" TEXT NOT NULL DEFAULT '',
+                ""Name"" TEXT NOT NULL DEFAULT '',
+                ""Country"" TEXT NOT NULL DEFAULT '',
+                ""Symbol"" TEXT NOT NULL DEFAULT '',
+                ""Kind"" INTEGER NOT NULL DEFAULT 0,
+                ""ExchangeRate"" REAL NOT NULL DEFAULT 1,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""IsBase"" INTEGER NOT NULL DEFAULT 0,
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT '',
+                ""UpdatedAt"" TEXT NOT NULL DEFAULT ''
             );");
 
         EnsureTable(conn, "MaintenanceRequests", @"

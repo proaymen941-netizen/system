@@ -5,6 +5,86 @@ namespace BusinessSuite.Data;
 
 public static class SeedData
 {
+    public static void SeedBranchesAndWarehouses(AppDbContext db)
+    {
+        if (!db.Branches.Any())
+        {
+            db.Branches.Add(new Branch
+            {
+                Code = "01",
+                ArabicName = "الفرع الرئيسي",
+                ForeignName = "Main Branch",
+                FinancialYear = DateTime.Now.Year.ToString(),
+                IsMain = true,
+                IsActive = true,
+                Phone = "0112345678",
+                City = "الرياض",
+                Region = "منطقة الرياض",
+                Country = "المملكة العربية السعودية",
+                Manager = "مدير النظام",
+            });
+            db.SaveChanges();
+        }
+
+        if (!db.Warehouses.Any())
+        {
+            var mainBranch = db.Branches.FirstOrDefault(b => b.IsMain);
+            db.Warehouses.Add(new Warehouse
+            {
+                Code = "01",
+                Name = "المخزن الرئيسي",
+                ForeignName = "Main Warehouse",
+                BranchId = mainBranch?.Id,
+                IsMain = true,
+                IsActive = true,
+                WarehouseType = "رئيسي",
+                City = "الرياض",
+                Country = "المملكة العربية السعودية",
+                Manager = "أمين المخزن",
+            });
+            db.SaveChanges();
+        }
+    }
+
+    public static void SeedCurrencies(AppDbContext db)
+    {
+        if (db.Currencies.Any()) return;
+        db.Currencies.Add(new Currency
+        {
+            Code = "SAR",
+            Name = "ريال سعودي",
+            Country = "المملكة العربية السعودية",
+            Symbol = "ر.س",
+            Kind = CurrencyKind.Local,
+            ExchangeRate = 1m,
+            IsActive = true,
+            IsBase = true,
+        });
+        db.Currencies.Add(new Currency
+        {
+            Code = "USD",
+            Name = "دولار أمريكي",
+            Country = "الولايات المتحدة",
+            Symbol = "$",
+            Kind = CurrencyKind.Foreign,
+            ExchangeRate = 3.75m,
+            IsActive = true,
+            IsBase = false,
+        });
+        db.Currencies.Add(new Currency
+        {
+            Code = "EUR",
+            Name = "يورو",
+            Country = "الاتحاد الأوروبي",
+            Symbol = "€",
+            Kind = CurrencyKind.Foreign,
+            ExchangeRate = 4.05m,
+            IsActive = true,
+            IsBase = false,
+        });
+        db.SaveChanges();
+    }
+
     public static void Initialize(AppDbContext db)
     {
         foreach (var u in db.Users.Where(u => u.UserNumber == null).ToList())
