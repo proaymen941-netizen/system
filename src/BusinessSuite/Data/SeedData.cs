@@ -7,23 +7,11 @@ public static class SeedData
 {
     public static void Initialize(AppDbContext db)
     {
-        if (!db.Users.Any())
+        foreach (var u in db.Users.Where(u => u.UserNumber == null).ToList())
         {
-            db.Users.AddRange(
-                new AppUser { Username = "ayman", FullName = "مدير النظام", PasswordHash = AuthService.Hash("123456"), Role = UserRole.Admin, UserNumber = 100, Email = "admin@company.com", Phone = "0112345678", Position = "مدير عام", Department = "الإدارة العامة", DateOfBirth = new DateTime(1980, 1, 15), Address = "الرياض - حي العليا" },
-                new AppUser { Username = "cashier", FullName = "موظف الكاشير", PasswordHash = AuthService.Hash("cashier"), Role = UserRole.Cashier, UserNumber = 101, Email = "cashier@company.com", Phone = "0112345679", Position = "كاشير", Department = "المبيعات", DateOfBirth = new DateTime(1990, 6, 20), Address = "الرياض - حي الناصرية" },
-                new AppUser { Username = "accountant", FullName = "المحاسب", PasswordHash = AuthService.Hash("accountant"), Role = UserRole.Accountant, UserNumber = 102, Email = "accountant@company.com", Phone = "0112345680", Position = "محاسب", Department = "المحاسبة", DateOfBirth = new DateTime(1985, 3, 10), Address = "الرياض - حي الملقا" }
-            );
-            db.SaveChanges();
+            u.UserNumber = 100 + u.Id;
         }
-        else
-        {
-            foreach (var u in db.Users.Where(u => u.UserNumber == null).ToList())
-            {
-                u.UserNumber = 100 + u.Id;
-            }
-            db.SaveChanges();
-        }
+        db.SaveChanges();
 
         if (!db.CompanySettings.Any())
         {
