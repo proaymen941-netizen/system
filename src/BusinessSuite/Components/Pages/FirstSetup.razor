@@ -1,0 +1,77 @@
+@inject AuthService Auth
+
+<div class="login-shell">
+    <div class="login-card" style="max-width:440px">
+        <div class="login-brand">
+            <div class="brand-logo big">🌿</div>
+            <h1>مرحباً بك في النظام</h1>
+            <p>أنشئ حساب المدير للبدء</p>
+        </div>
+
+        <div style="background:var(--accent-light,#eaf4ff);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:0.92rem;color:var(--accent,#2563eb);border:1px solid var(--accent-border,#bfdbfe)">
+            🔐 هذه المرة الأولى لتشغيل النظام. قم بإنشاء حساب المدير الرئيسي للمتابعة.
+        </div>
+
+        <EditForm Model="this" OnValidSubmit="DoSetup" class="login-form">
+            <label>الاسم الكامل</label>
+            <input @bind="_fullName" placeholder="مثال: أحمد محمد" autofocus />
+
+            <label>اسم المستخدم</label>
+            <input @bind="_username" placeholder="مثال: admin" />
+
+            <label>كلمة المرور</label>
+            <input type="password" @bind="_password" placeholder="••••••" />
+
+            <label>تأكيد كلمة المرور</label>
+            <input type="password" @bind="_confirmPassword" placeholder="••••••" />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="login-error">@_error</div>
+            }
+
+            <button type="submit" class="btn-primary login-btn" disabled="@_busy">
+                @(_busy ? "جاري الإنشاء..." : "إنشاء الحساب والدخول")
+            </button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnSetupComplete { get; set; }
+
+    private string _fullName = "";
+    private string _username = "";
+    private string _password = "";
+    private string _confirmPassword = "";
+    private string? _error;
+    private bool _busy;
+
+    private async Task DoSetup()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_fullName))
+        { _error = "الرجاء إدخال الاسم الكامل"; return; }
+
+        if (string.IsNullOrWhiteSpace(_username))
+        { _error = "الرجاء إدخال اسم المستخدم"; return; }
+
+        if (_password.Length < 4)
+        { _error = "كلمة المرور يجب أن تكون 4 أحرف على الأقل"; return; }
+
+        if (_password != _confirmPassword)
+        { _error = "كلمتا المرور غير متطابقتين"; return; }
+
+        _busy = true;
+        try
+        {
+            var ok = await Auth.CreateFirstAdminAsync(_username, _fullName, _password);
+            if (!ok)
+                _error = "حدث خطأ أثناء إنشاء الحساب، يبدو أن هناك حساباً موجوداً بالفعل";
+            else
+                await OnSetupComplete.InvokeAsync();
+        }
+        finally { _busy = false; }
+    }
+}
