@@ -12,6 +12,8 @@ public class Product
     [MaxLength(40)]
     public string Sku { get; set; } = string.Empty;
 
+    public int DisplayNumber { get; set; }
+
     [MaxLength(60)]
     public string Category { get; set; } = string.Empty;
 

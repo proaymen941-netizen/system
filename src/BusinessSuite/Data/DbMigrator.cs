@@ -20,6 +20,9 @@ public static class DbMigrator
         TryAdd(conn, columns, "SaleInvoices", "Notes", "TEXT NOT NULL DEFAULT ''");
         TryAdd(conn, columns, "SaleInvoices", "ShiftId", "INTEGER NULL");
 
+        TryAdd(conn, columns, "Products", "DisplayNumber", "INTEGER NOT NULL DEFAULT 0");
+        TryAdd(conn, columns, "SaleInvoiceItems", "DisplayNumber", "INTEGER NOT NULL DEFAULT 0");
+
         TryAdd(conn, columns, "Users", "UserNumber", "INTEGER NULL");
         TryAdd(conn, columns, "Users", "Email", "TEXT NOT NULL DEFAULT ''");
         TryAdd(conn, columns, "Users", "Phone", "TEXT NOT NULL DEFAULT ''");
@@ -57,6 +60,231 @@ public static class DbMigrator
                 ""IsClosed"" INTEGER NOT NULL DEFAULT 0
             );");
 
+        EnsureTable(conn, "Licenses", @"
+            CREATE TABLE IF NOT EXISTS ""Licenses"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Licenses"" PRIMARY KEY AUTOINCREMENT,
+                ""CustomerName"" TEXT NOT NULL DEFAULT '',
+                ""LicenseKey"" TEXT NOT NULL DEFAULT '',
+                ""MaxManagerDevices"" INTEGER NOT NULL DEFAULT 1,
+                ""MaxCashierDevices"" INTEGER NOT NULL DEFAULT 1,
+                ""MaxAccountantDevices"" INTEGER NOT NULL DEFAULT 0,
+                ""ActivatedAt"" TEXT NOT NULL DEFAULT '',
+                ""ExpiresAt"" TEXT NULL,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""IssuedBy"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "Devices", @"
+            CREATE TABLE IF NOT EXISTS ""Devices"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Devices"" PRIMARY KEY AUTOINCREMENT,
+                ""DeviceFingerprint"" TEXT NOT NULL DEFAULT '',
+                ""DeviceName"" TEXT NOT NULL DEFAULT '',
+                ""Kind"" INTEGER NOT NULL DEFAULT 1,
+                ""IpAddress"" TEXT NOT NULL DEFAULT '',
+                ""UserAgent"" TEXT NOT NULL DEFAULT '',
+                ""RegisteredAt"" TEXT NOT NULL DEFAULT '',
+                ""LastSeenAt"" TEXT NOT NULL DEFAULT '',
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""IsBlocked"" INTEGER NOT NULL DEFAULT 0,
+                ""Notes"" TEXT NOT NULL DEFAULT ''
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_Devices_DeviceFingerprint"" ON ""Devices"" (""DeviceFingerprint"");");
+
+        EnsureTable(conn, "UserPermissions", @"
+            CREATE TABLE IF NOT EXISTS ""UserPermissions"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_UserPermissions"" PRIMARY KEY AUTOINCREMENT,
+                ""UserId"" INTEGER NOT NULL DEFAULT 0,
+                ""PermissionKey"" TEXT NOT NULL DEFAULT '',
+                ""IsGranted"" INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserPermissions_UserId_PermissionKey"" ON ""UserPermissions"" (""UserId"", ""PermissionKey"");");
+
+        EnsureTable(conn, "ChartOfAccounts", @"
+            CREATE TABLE IF NOT EXISTS ""ChartOfAccounts"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_ChartOfAccounts"" PRIMARY KEY AUTOINCREMENT,
+                ""Code"" TEXT NOT NULL DEFAULT '',
+                ""Name"" TEXT NOT NULL DEFAULT '',
+                ""Kind"" INTEGER NOT NULL DEFAULT 0,
+                ""ParentId"" INTEGER NULL,
+                ""IsActive"" INTEGER NOT NULL DEFAULT 1,
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""OpeningBalance"" REAL NOT NULL DEFAULT 0
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ChartOfAccounts_Code"" ON ""ChartOfAccounts"" (""Code"");");
+
+        EnsureTable(conn, "Vouchers", @"
+            CREATE TABLE IF NOT EXISTS ""Vouchers"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Vouchers"" PRIMARY KEY AUTOINCREMENT,
+                ""VoucherNumber"" TEXT NOT NULL DEFAULT '',
+                ""Type"" INTEGER NOT NULL DEFAULT 0,
+                ""Status"" INTEGER NOT NULL DEFAULT 0,
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""PartyName"" TEXT NOT NULL DEFAULT '',
+                ""PartyType"" TEXT NOT NULL DEFAULT '',
+                ""PartyId"" INTEGER NULL,
+                ""Amount"" REAL NOT NULL DEFAULT 0,
+                ""PaymentMethod"" TEXT NOT NULL DEFAULT 'نقدي',
+                ""Description"" TEXT NOT NULL DEFAULT '',
+                ""Reference"" TEXT NOT NULL DEFAULT '',
+                ""CreatedBy"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT '',
+                ""PostedAt"" TEXT NULL,
+                ""PostedBy"" TEXT NOT NULL DEFAULT '',
+                ""DebitAccountId"" INTEGER NULL,
+                ""CreditAccountId"" INTEGER NULL
+            );");
+
+        EnsureTable(conn, "ManualJournals", @"
+            CREATE TABLE IF NOT EXISTS ""ManualJournals"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_ManualJournals"" PRIMARY KEY AUTOINCREMENT,
+                ""EntryNumber"" TEXT NOT NULL DEFAULT '',
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""Description"" TEXT NOT NULL DEFAULT '',
+                ""IsPosted"" INTEGER NOT NULL DEFAULT 0,
+                ""CreatedBy"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "ManualJournalLines", @"
+            CREATE TABLE IF NOT EXISTS ""ManualJournalLines"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_ManualJournalLines"" PRIMARY KEY AUTOINCREMENT,
+                ""ManualJournalEntryId"" INTEGER NOT NULL DEFAULT 0,
+                ""AccountId"" INTEGER NOT NULL DEFAULT 0,
+                ""Description"" TEXT NOT NULL DEFAULT '',
+                ""Debit"" REAL NOT NULL DEFAULT 0,
+                ""Credit"" REAL NOT NULL DEFAULT 0
+            );");
+
+        EnsureTable(conn, "Custodies", @"
+            CREATE TABLE IF NOT EXISTS ""Custodies"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Custodies"" PRIMARY KEY AUTOINCREMENT,
+                ""EmployeeId"" INTEGER NOT NULL DEFAULT 0,
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""Amount"" REAL NOT NULL DEFAULT 0,
+                ""IsDebit"" INTEGER NOT NULL DEFAULT 1,
+                ""Description"" TEXT NOT NULL DEFAULT '',
+                ""Reference"" TEXT NOT NULL DEFAULT '',
+                ""IsSettled"" INTEGER NOT NULL DEFAULT 0,
+                ""SettledAt"" TEXT NULL,
+                ""CreatedBy"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "PenaltiesRewards", @"
+            CREATE TABLE IF NOT EXISTS ""PenaltiesRewards"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_PenaltiesRewards"" PRIMARY KEY AUTOINCREMENT,
+                ""EmployeeId"" INTEGER NOT NULL DEFAULT 0,
+                ""Kind"" INTEGER NOT NULL DEFAULT 0,
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""Amount"" REAL NOT NULL DEFAULT 0,
+                ""IsRecurring"" INTEGER NOT NULL DEFAULT 0,
+                ""Reason"" TEXT NOT NULL DEFAULT '',
+                ""CreatedBy"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "MonthlyAbsences", @"
+            CREATE TABLE IF NOT EXISTS ""MonthlyAbsences"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_MonthlyAbsences"" PRIMARY KEY AUTOINCREMENT,
+                ""EmployeeId"" INTEGER NOT NULL DEFAULT 0,
+                ""Year"" INTEGER NOT NULL DEFAULT 0,
+                ""Month"" INTEGER NOT NULL DEFAULT 0,
+                ""AbsentDays"" INTEGER NOT NULL DEFAULT 0,
+                ""LateDays"" INTEGER NOT NULL DEFAULT 0,
+                ""OvertimeHours"" INTEGER NOT NULL DEFAULT 0,
+                ""DeductionAmount"" REAL NOT NULL DEFAULT 0,
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "Installments", @"
+            CREATE TABLE IF NOT EXISTS ""Installments"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_Installments"" PRIMARY KEY AUTOINCREMENT,
+                ""EmployeeId"" INTEGER NOT NULL DEFAULT 0,
+                ""StartDate"" TEXT NOT NULL DEFAULT '',
+                ""TotalAmount"" REAL NOT NULL DEFAULT 0,
+                ""MonthlyAmount"" REAL NOT NULL DEFAULT 0,
+                ""TotalMonths"" INTEGER NOT NULL DEFAULT 0,
+                ""PaidMonths"" INTEGER NOT NULL DEFAULT 0,
+                ""IsCompleted"" INTEGER NOT NULL DEFAULT 0,
+                ""Description"" TEXT NOT NULL DEFAULT '',
+                ""CreatedBy"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "SalesReturns", @"
+            CREATE TABLE IF NOT EXISTS ""SalesReturns"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_SalesReturns"" PRIMARY KEY AUTOINCREMENT,
+                ""ReturnNumber"" TEXT NOT NULL DEFAULT '',
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""OriginalInvoiceId"" INTEGER NULL,
+                ""OriginalInvoiceNumber"" TEXT NOT NULL DEFAULT '',
+                ""CustomerId"" INTEGER NULL,
+                ""CustomerName"" TEXT NOT NULL DEFAULT '',
+                ""Subtotal"" REAL NOT NULL DEFAULT 0,
+                ""Tax"" REAL NOT NULL DEFAULT 0,
+                ""Total"" REAL NOT NULL DEFAULT 0,
+                ""RefundMethod"" TEXT NOT NULL DEFAULT 'نقدي',
+                ""Reason"" TEXT NOT NULL DEFAULT '',
+                ""CreatedBy"" TEXT NOT NULL DEFAULT ''
+            );");
+
+        EnsureTable(conn, "SalesReturnItems", @"
+            CREATE TABLE IF NOT EXISTS ""SalesReturnItems"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_SalesReturnItems"" PRIMARY KEY AUTOINCREMENT,
+                ""SalesReturnId"" INTEGER NOT NULL DEFAULT 0,
+                ""ProductId"" INTEGER NOT NULL DEFAULT 0,
+                ""ProductName"" TEXT NOT NULL DEFAULT '',
+                ""Quantity"" INTEGER NOT NULL DEFAULT 0,
+                ""UnitPrice"" REAL NOT NULL DEFAULT 0,
+                ""LineTotal"" REAL NOT NULL DEFAULT 0
+            );");
+
+        EnsureTable(conn, "StockIssues", @"
+            CREATE TABLE IF NOT EXISTS ""StockIssues"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_StockIssues"" PRIMARY KEY AUTOINCREMENT,
+                ""VoucherNumber"" TEXT NOT NULL DEFAULT '',
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""Reason"" INTEGER NOT NULL DEFAULT 0,
+                ""Department"" TEXT NOT NULL DEFAULT '',
+                ""ReceivedBy"" TEXT NOT NULL DEFAULT '',
+                ""Notes"" TEXT NOT NULL DEFAULT '',
+                ""CreatedBy"" TEXT NOT NULL DEFAULT '',
+                ""IsPosted"" INTEGER NOT NULL DEFAULT 0
+            );");
+
+        EnsureTable(conn, "StockIssueItems", @"
+            CREATE TABLE IF NOT EXISTS ""StockIssueItems"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_StockIssueItems"" PRIMARY KEY AUTOINCREMENT,
+                ""StockIssueVoucherId"" INTEGER NOT NULL DEFAULT 0,
+                ""ProductId"" INTEGER NOT NULL DEFAULT 0,
+                ""ProductName"" TEXT NOT NULL DEFAULT '',
+                ""Quantity"" INTEGER NOT NULL DEFAULT 0,
+                ""UnitCost"" REAL NOT NULL DEFAULT 0,
+                ""LineTotal"" REAL NOT NULL DEFAULT 0
+            );");
+
+        EnsureTable(conn, "MaintenanceRequests", @"
+            CREATE TABLE IF NOT EXISTS ""MaintenanceRequests"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_MaintenanceRequests"" PRIMARY KEY AUTOINCREMENT,
+                ""TicketNumber"" TEXT NOT NULL DEFAULT '',
+                ""Date"" TEXT NOT NULL DEFAULT '',
+                ""CustomerId"" INTEGER NULL,
+                ""CustomerName"" TEXT NOT NULL DEFAULT '',
+                ""Phone"" TEXT NOT NULL DEFAULT '',
+                ""DeviceName"" TEXT NOT NULL DEFAULT '',
+                ""SerialNumber"" TEXT NOT NULL DEFAULT '',
+                ""ProblemDescription"" TEXT NOT NULL DEFAULT '',
+                ""Diagnosis"" TEXT NOT NULL DEFAULT '',
+                ""TechnicianId"" INTEGER NULL,
+                ""TechnicianName"" TEXT NOT NULL DEFAULT '',
+                ""Status"" INTEGER NOT NULL DEFAULT 0,
+                ""EstimatedCost"" REAL NOT NULL DEFAULT 0,
+                ""ActualCost"" REAL NOT NULL DEFAULT 0,
+                ""CompletedAt"" TEXT NULL,
+                ""Notes"" TEXT NOT NULL DEFAULT ''
+            );");
+
         conn.Close();
     }
 
@@ -85,86 +313,8 @@ public static class DbMigrator
         if (columns.Contains($"{table}.{column}")) return;
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition}";
-        try
-        {
-            cmd.ExecuteNonQuery();
-            Console.WriteLine($"[Migration] Added column {table}.{column}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Migration] Failed to add column {table}.{column}: {ex.Message}");
-            
-            // If column doesn't exist, try to recreate the table (for severe schema mismatches)
-            if (ex.Message.Contains("no such table") || ex.Message.Contains("already exists"))
-            {
-                // These are expected errors if table/column exists, silence them
-            }
-            else
-            {
-                // For other errors, attempt a more aggressive fix: drop and recreate
-                try
-                {
-                    Console.WriteLine($"[Migration] Attempting to recreate {table} table...");
-                    RecreateTable(conn, table, column, definition);
-                }
-                catch (Exception rex)
-                {
-                    Console.WriteLine($"[Migration] Failed to recreate {table}: {rex.Message}");
-                }
-            }
-        }
-    }
-
-    private static void RecreateTable(SqliteConnection conn, string table, string newColumn, string newDefinition)
-    {
-        // Get existing table schema
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"SELECT sql FROM sqlite_master WHERE type='table' AND name='{table}'";
-        var existingSql = cmd.ExecuteScalar()?.ToString();
-        if (string.IsNullOrEmpty(existingSql)) return;
-
-        // Read all data from the table
-        var data = new List<Dictionary<string, object?>>();
-        cmd.CommandText = $"SELECT * FROM \"{table}\"";
-        using var rdr = cmd.ExecuteReader();
-        var colNames = Enumerable.Range(0, rdr.FieldCount).Select(rdr.GetName).ToArray();
-        while (rdr.Read())
-        {
-            var row = new Dictionary<string, object?>();
-            foreach (var col in colNames)
-                row[col] = rdr[col];
-            data.Add(row);
-        }
-        rdr.Close();
-
-        // Drop and recreate with new column
-        cmd.CommandText = $"DROP TABLE \"{table}\"";
-        cmd.ExecuteNonQuery();
-
-        // Modify CREATE TABLE statement to include new column
-        var newCreateSql = AddColumnToCreateStatement(existingSql, table, newColumn, newDefinition);
-        cmd.CommandText = newCreateSql;
-        cmd.ExecuteNonQuery();
-
-        // Restore data
-        var columnList = string.Join(", ", colNames);
-        var paramList = string.Join(", ", colNames.Select((c, i) => "@p" + i));
-        cmd.CommandText = $"INSERT INTO \"{table}\" ({columnList}) VALUES ({paramList})";
-        foreach (var row in data)
-        {
-            cmd.Parameters.Clear();
-            for (int i = 0; i < colNames.Length; i++)
-                cmd.Parameters.AddWithValue("@p" + i, row[colNames[i]] ?? DBNull.Value);
-            cmd.ExecuteNonQuery();
-        }
-    }
-
-    private static string AddColumnToCreateStatement(string createSql, string table, string column, string definition)
-    {
-        // Find the closing parenthesis and insert the new column before it
-        var idx = createSql.LastIndexOf(')');
-        if (idx < 0) return createSql;
-        return createSql.Insert(idx, $", \"{column}\" {definition}");
+        try { cmd.ExecuteNonQuery(); }
+        catch (Exception ex) { Console.WriteLine($"[Migration] {table}.{column}: {ex.Message}"); }
     }
 
     private static void EnsureTable(SqliteConnection conn, string table, string createSql)
@@ -175,7 +325,8 @@ public static class DbMigrator
         if (!exists)
         {
             cmd.CommandText = createSql;
-            cmd.ExecuteNonQuery();
+            try { cmd.ExecuteNonQuery(); }
+            catch (Exception ex) { Console.WriteLine($"[Migration] Create {table}: {ex.Message}"); }
         }
     }
 }

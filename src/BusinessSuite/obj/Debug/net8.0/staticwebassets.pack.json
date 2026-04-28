@@ -9,6 +9,14 @@
       "PackagePath": "staticwebassets/favicon.png"
     },
     {
+      "Id": "/home/runner/workspace/src/BusinessSuite/wwwroot/js/device.js",
+      "PackagePath": "staticwebassets/js/device.js"
+    },
+    {
+      "Id": "/home/runner/workspace/src/BusinessSuite/wwwroot/js/pos-keyboard.js",
+      "PackagePath": "staticwebassets/js/pos-keyboard.js"
+    },
+    {
       "Id": "/home/runner/workspace/src/BusinessSuite/wwwroot/sample/products.csv",
       "PackagePath": "staticwebassets/sample/products.csv"
     },

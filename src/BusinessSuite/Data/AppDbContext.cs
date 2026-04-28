@@ -24,6 +24,26 @@ public class AppDbContext : DbContext
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
 
+    public DbSet<LicenseInfo> Licenses => Set<LicenseInfo>();
+    public DbSet<RegisteredDevice> Devices => Set<RegisteredDevice>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+
+    public DbSet<ChartOfAccount> ChartOfAccounts => Set<ChartOfAccount>();
+    public DbSet<FinancialVoucher> Vouchers => Set<FinancialVoucher>();
+    public DbSet<ManualJournalEntry> ManualJournals => Set<ManualJournalEntry>();
+    public DbSet<ManualJournalLine> ManualJournalLines => Set<ManualJournalLine>();
+    public DbSet<EmployeeCustody> Custodies => Set<EmployeeCustody>();
+
+    public DbSet<EmployeePenaltyReward> PenaltiesRewards => Set<EmployeePenaltyReward>();
+    public DbSet<MonthlyAbsence> MonthlyAbsences => Set<MonthlyAbsence>();
+    public DbSet<EmployeeInstallment> Installments => Set<EmployeeInstallment>();
+
+    public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
+    public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
+    public DbSet<StockIssueVoucher> StockIssues => Set<StockIssueVoucher>();
+    public DbSet<StockIssueItem> StockIssueItems => Set<StockIssueItem>();
+    public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -46,5 +66,30 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CashierShift>().Property(c => c.TotalCash).HasConversion<double>();
         modelBuilder.Entity<CashierShift>().Property(c => c.TotalCard).HasConversion<double>();
         modelBuilder.Entity<CashierShift>().Property(c => c.TotalOther).HasConversion<double>();
+
+        modelBuilder.Entity<ChartOfAccount>().Property(c => c.OpeningBalance).HasConversion<double>();
+        modelBuilder.Entity<FinancialVoucher>().Property(v => v.Amount).HasConversion<double>();
+        modelBuilder.Entity<ManualJournalLine>().Property(l => l.Debit).HasConversion<double>();
+        modelBuilder.Entity<ManualJournalLine>().Property(l => l.Credit).HasConversion<double>();
+        modelBuilder.Entity<EmployeeCustody>().Property(c => c.Amount).HasConversion<double>();
+
+        modelBuilder.Entity<EmployeePenaltyReward>().Property(p => p.Amount).HasConversion<double>();
+        modelBuilder.Entity<MonthlyAbsence>().Property(m => m.DeductionAmount).HasConversion<double>();
+        modelBuilder.Entity<EmployeeInstallment>().Property(i => i.TotalAmount).HasConversion<double>();
+        modelBuilder.Entity<EmployeeInstallment>().Property(i => i.MonthlyAmount).HasConversion<double>();
+
+        modelBuilder.Entity<SalesReturn>().Property(s => s.Subtotal).HasConversion<double>();
+        modelBuilder.Entity<SalesReturn>().Property(s => s.Tax).HasConversion<double>();
+        modelBuilder.Entity<SalesReturn>().Property(s => s.Total).HasConversion<double>();
+        modelBuilder.Entity<SalesReturnItem>().Property(i => i.UnitPrice).HasConversion<double>();
+        modelBuilder.Entity<SalesReturnItem>().Property(i => i.LineTotal).HasConversion<double>();
+        modelBuilder.Entity<StockIssueItem>().Property(i => i.UnitCost).HasConversion<double>();
+        modelBuilder.Entity<StockIssueItem>().Property(i => i.LineTotal).HasConversion<double>();
+        modelBuilder.Entity<MaintenanceRequest>().Property(m => m.EstimatedCost).HasConversion<double>();
+        modelBuilder.Entity<MaintenanceRequest>().Property(m => m.ActualCost).HasConversion<double>();
+
+        modelBuilder.Entity<RegisteredDevice>().HasIndex(d => d.DeviceFingerprint).IsUnique();
+        modelBuilder.Entity<UserPermission>().HasIndex(p => new { p.UserId, p.PermissionKey }).IsUnique();
+        modelBuilder.Entity<ChartOfAccount>().HasIndex(c => c.Code).IsUnique();
     }
 }
