@@ -38,6 +38,20 @@ public class InventoryService
         return await db.Products.FirstOrDefaultAsync(p => p.Sku == barcode);
     }
 
+    public async Task<Product?> GetByDisplayNumberAsync(int number)
+    {
+        if (number <= 0) return null;
+        await using var db = _factory.CreateDbContext();
+        return await db.Products.FirstOrDefaultAsync(p => p.DisplayNumber == number);
+    }
+
+    public async Task<int> GetNextDisplayNumberAsync()
+    {
+        await using var db = _factory.CreateDbContext();
+        var max = await db.Products.MaxAsync(p => (int?)p.DisplayNumber) ?? 0;
+        return max + 1;
+    }
+
     public async Task SaveProductAsync(Product p)
     {
         if (!_auth.HasRole(UserRole.Admin, UserRole.Accountant)) throw new AuthorizationException();
