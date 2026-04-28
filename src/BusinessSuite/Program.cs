@@ -33,6 +33,11 @@ builder.Services.AddScoped<PermissionService>();
 builder.Services.AddScoped<AccountingExtendedService>();
 builder.Services.AddScoped<HrExtendedService>();
 builder.Services.AddScoped<OperationsExtendedService>();
+builder.Services.AddScoped<CurrencyService>();
+builder.Services.AddScoped<BranchService>();
+builder.Services.AddScoped<WarehouseService>();
+builder.Services.AddScoped<SessionService>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<BackupService>();
 builder.Services.AddSingleton<QrCodeService>();
 builder.Services.AddSingleton<ExportService>();
@@ -48,6 +53,8 @@ using (var scope = app.Services.CreateScope())
     db.Database.EnsureCreated();
     DbMigrator.Apply(db);
     SeedData.Initialize(db);
+    SeedData.SeedCurrencies(db);
+    SeedData.SeedBranchesAndWarehouses(db);
 }
 
 if (!app.Environment.IsDevelopment())
