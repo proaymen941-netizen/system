@@ -56,6 +56,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xBdWRpdExvZ1BhZ2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/Branches.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xCcmFuY2hlcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/CashierShifts.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDYXNoaWVyU2hpZnRzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
@@ -70,6 +74,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/CompanySettingsPage.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDb21wYW55U2V0dGluZ3NQYWdlLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/Currencies.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDdXJyZW5jaWVzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/CustodiesPage.razor]
@@ -176,6 +184,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTYWxlc1JldHVybnNQYWdlLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/Sessions.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTZXNzaW9ucy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/Settings.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xTZXR0aW5ncy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -202,6 +214,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/VouchersPage.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xWb3VjaGVyc1BhZ2UucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/DZ/Downloads/src/BusinessSuite/Components/Pages/Warehouses.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xXYXJlaG91c2VzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/DZ/Downloads/src/BusinessSuite/Components/Routes.razor]

@@ -13,6 +13,9 @@ public class AuthService
 
     public AppUser? CurrentUser { get; private set; }
     public bool IsAuthenticated => CurrentUser != null;
+    public int? CurrentSessionId { get; set; }
+    public string CurrentDevice { get; set; } = "";
+    public string CurrentIp { get; set; } = "";
 
     public event Action? OnChange;
 
@@ -75,6 +78,7 @@ public class AuthService
      public void Logout()
     {
         CurrentUser = null;
+        CurrentSessionId = null;
         OnChange?.Invoke();
     }
 
