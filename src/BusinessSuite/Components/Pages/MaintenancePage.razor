@@ -1,0 +1,155 @@
+@page "/maintenance"
+@rendermode InteractiveServer
+@inject OperationsExtendedService OpsSvc
+@inject CustomerService CustSvc
+@inject HrService HrSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>طلبات الصيانة</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">طلبات الصيانة / الفني</h1>
+            <p class="page-subtitle">تسجيل ومتابعة طلبات الصيانة الواردة من العملاء</p>
+        </div>
+        <div class="page-header-actions">
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant, UserRole.Cashier))
+            {
+                <button class="primary-btn" @onclick="StartNew">+ طلب صيانة جديد</button>
+            }
+        </div>
+    </div>
+
+    <div class="stat-grid stat-grid-4">
+        <div class="stat-card stat-blue"><div class="stat-icon">📋</div><div class="stat-body"><div class="stat-label">طلبات جديدة</div><div class="stat-value">@_list.Count(m => m.Status == MaintenanceStatus.New)</div></div></div>
+        <div class="stat-card stat-orange"><div class="stat-icon">🔧</div><div class="stat-body"><div class="stat-label">قيد العمل</div><div class="stat-value">@_list.Count(m => m.Status == MaintenanceStatus.InProgress)</div></div></div>
+        <div class="stat-card stat-purple"><div class="stat-icon">⏸️</div><div class="stat-body"><div class="stat-label">بانتظار قطع</div><div class="stat-value">@_list.Count(m => m.Status == MaintenanceStatus.WaitingParts)</div></div></div>
+        <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-body"><div class="stat-label">مكتملة</div><div class="stat-value">@_list.Count(m => m.Status == MaintenanceStatus.Completed)</div></div></div>
+    </div>
+
+    <div class="panel">
+        <table class="table-soft striped">
+            <thead><tr><th>التذكرة</th><th>التاريخ</th><th>العميل</th><th>الجهاز</th><th>المشكلة</th><th>الفني</th><th>الحالة</th><th>التكلفة</th><th></th></tr></thead>
+            <tbody>
+                @if (!_list.Any()) { <tr><td colspan="9" class="empty">لا توجد طلبات</td></tr> }
+                @foreach (var m in _list)
+                {
+                    <tr>
+                        <td><strong>@m.TicketNumber</strong></td>
+                        <td>@m.Date.ToString("yyyy-MM-dd")</td>
+                        <td>@m.CustomerName <span class="muted">@m.Phone</span></td>
+                        <td>@m.DeviceName <span class="muted">@m.SerialNumber</span></td>
+                        <td>@m.ProblemDescription</td>
+                        <td>@m.TechnicianName</td>
+                        <td>
+                            <select class="input" style="min-width:140px" @bind="m.Status" @bind:after="() => UpdateStatus(m)">
+                                <option value="@MaintenanceStatus.New">جديد</option>
+                                <option value="@MaintenanceStatus.InProgress">قيد العمل</option>
+                                <option value="@MaintenanceStatus.WaitingParts">بانتظار قطع</option>
+                                <option value="@MaintenanceStatus.Completed">مكتمل</option>
+                                <option value="@MaintenanceStatus.Cancelled">ملغى</option>
+                            </select>
+                        </td>
+                        <td>@m.ActualCost.ToString("N2")</td>
+                        <td>
+                            <button class="link" @onclick="() => Edit(m)">تعديل</button>
+                            @if (Auth.HasRole(UserRole.Admin))
+                            {
+                                <button class="link danger" @onclick="() => Delete(m.Id)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="() => _editing = null">
+            <div class="modal" style="max-width:800px" @onclick:stopPropagation="true">
+                <h3>@(_editing.Id == 0 ? "طلب صيانة جديد" : "تعديل طلب الصيانة")</h3>
+                <EditForm Model="_editing" OnValidSubmit="Save">
+                    <div class="form-grid">
+                        <label>التاريخ<input class="input" type="date" @bind="_editing.Date" /></label>
+                        <label>العميل
+                            <select class="input" @bind="_editing.CustomerId">
+                                <option value="0">— أدخل يدوياً —</option>
+                                @foreach (var c in _customers) { <option value="@c.Id">@c.Name</option> }
+                            </select>
+                        </label>
+                        <label>اسم العميل<input class="input" @bind="_editing.CustomerName" required /></label>
+                        <label>الهاتف<input class="input" @bind="_editing.Phone" /></label>
+                        <label>الجهاز<input class="input" @bind="_editing.DeviceName" /></label>
+                        <label>الرقم التسلسلي<input class="input" @bind="_editing.SerialNumber" /></label>
+                        <label class="full">وصف المشكلة<textarea class="input" rows="2" @bind="_editing.ProblemDescription" required></textarea></label>
+                        <label class="full">التشخيص<textarea class="input" rows="2" @bind="_editing.Diagnosis"></textarea></label>
+                        <label>الفني
+                            <select class="input" @bind="_editing.TechnicianId">
+                                <option value="0">— غير محدد —</option>
+                                @foreach (var e in _employees) { <option value="@e.Id">@e.Name</option> }
+                            </select>
+                        </label>
+                        <label>اسم الفني<input class="input" @bind="_editing.TechnicianName" /></label>
+                        <label>التكلفة المتوقعة<input class="input" type="number" step="0.01" @bind="_editing.EstimatedCost" /></label>
+                        <label>التكلفة الفعلية<input class="input" type="number" step="0.01" @bind="_editing.ActualCost" /></label>
+                        <label class="full">ملاحظات<input class="input" @bind="_editing.Notes" /></label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="ghost-btn" @onclick="() => _editing = null">إلغاء</button>
+                        <button type="submit" class="primary-btn">حفظ</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<MaintenanceRequest> _list = new();
+    private List<Customer> _customers = new();
+    private List<Employee> _employees = new();
+    private MaintenanceRequest? _editing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await CustSvc.GetAsync();
+        _employees = await HrSvc.GetEmployeesAsync();
+        await Refresh();
+    }
+
+    private async Task Refresh() => _list = await OpsSvc.GetMaintenanceAsync();
+
+    private void StartNew() => _editing = new MaintenanceRequest { Date = DateTime.Today, Status = MaintenanceStatus.New };
+    private void Edit(MaintenanceRequest m) => _editing = new MaintenanceRequest
+    {
+        Id = m.Id, TicketNumber = m.TicketNumber, Date = m.Date, CustomerId = m.CustomerId, CustomerName = m.CustomerName,
+        Phone = m.Phone, DeviceName = m.DeviceName, SerialNumber = m.SerialNumber, ProblemDescription = m.ProblemDescription,
+        Diagnosis = m.Diagnosis, TechnicianId = m.TechnicianId, TechnicianName = m.TechnicianName, Status = m.Status,
+        EstimatedCost = m.EstimatedCost, ActualCost = m.ActualCost, Notes = m.Notes
+    };
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        if (_editing.TechnicianId.HasValue && _editing.TechnicianId.Value > 0)
+        {
+            var t = _employees.FirstOrDefault(e => e.Id == _editing.TechnicianId.Value);
+            if (t != null) _editing.TechnicianName = t.Name;
+        }
+        await OpsSvc.SaveMaintenanceAsync(_editing);
+        await Audit.LogAsync(_editing.Id == 0 ? "إنشاء طلب صيانة" : "تعديل طلب صيانة", "الصيانة", _editing.CustomerName);
+        _editing = null;
+        await Refresh();
+    }
+
+    private async Task UpdateStatus(MaintenanceRequest m)
+    {
+        await OpsSvc.UpdateMaintenanceStatusAsync(m.Id, m.Status);
+        await Audit.LogAsync("تحديث حالة صيانة", "الصيانة", $"{m.TicketNumber} -> {m.Status}");
+    }
+
+    private async Task Delete(int id) { await OpsSvc.DeleteMaintenanceAsync(id); await Refresh(); }
+}

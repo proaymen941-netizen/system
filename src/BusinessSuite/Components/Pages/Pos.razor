@@ -1,6 +1,6 @@
 @page "/pos"
 @rendermode InteractiveServer
-@implements IDisposable
+@implements IAsyncDisposable
 @inject InventoryService InvSvc
 @inject PosService PosSvc
 @inject CustomerService CustSvc
@@ -47,7 +47,7 @@
     </div>
 }
 
-<div class="pos-fullscreen">
+<div class="pos-fullscreen" dir="rtl">
     <div class="pos-topbar">
         <div class="pos-topbar-left">
             <span class="pos-title">🛒 نقطة البيع</span>
@@ -59,6 +59,7 @@
             {
                 <span class="shift-badge closed">⚠️ لا توجد وردية</span>
             }
+            <span class="pos-keyboard-hint">⌨️ اضغط رقم المنتج ثم Enter للإضافة • → للطباعة • Esc لمسح الرقم • Delete لمسح الطلب</span>
         </div>
         <div class="pos-topbar-right">
             <span class="pos-time">@_now.ToString("hh:mm tt")</span>
@@ -75,38 +76,8 @@
     </div>
 
     <div class="pos-body">
-        <div class="pos-left">
-            <div class="pos-search-bar">
-                <input class="pos-search-input" placeholder="🔍 بحث عن منتج..." @bind="_search" @bind:event="oninput" />
-                <input class="pos-barcode-input" id="barcode-input" placeholder="📱 باركود..." @bind="_barcode" @bind:event="oninput" @onkeyup="OnBarcodeKey" />
-            </div>
-
-            <div class="pos-categories">
-                <button class="cat-btn @(_category == "" ? "active" : "")" @onclick='() => _category = ""'>الكل</button>
-                @foreach (var cat in _categories)
-                {
-                    <button class="cat-btn @(_category == cat ? "active" : "")" @onclick="() => _category = cat">@cat</button>
-                }
-            </div>
-
-            <div class="pos-product-grid">
-                @{ int num = 1; }
-                @foreach (var p in FilteredProducts)
-                {
-                    var idx = num++;
-                    <button class="pos-product-btn @(p.Quantity <= 0 ? "out-of-stock" : "")"
-                            @onclick="() => AddItem(p)"
-                            disabled="@(p.Quantity <= 0)">
-                        <div class="ppb-code">@p.Sku</div>
-                        <div class="ppb-name">@p.Name</div>
-                        <div class="ppb-price">@p.Price.ToString("N0") @_currency</div>
-                        @if (p.Quantity <= 0) { <div class="ppb-out">نفذ</div> }
-                    </button>
-                }
-            </div>
-        </div>
-
-        <div class="pos-right">
+        <!-- في الواجهة العربية: قائمة الطلب يمين، شبكة المنتجات يسار -->
+        <div class="pos-right pos-cart-side">
             <div class="pos-order-types">
                 @foreach (var ot in _orderTypes)
                 {
@@ -129,22 +100,29 @@
                     <div class="pos-empty-cart">
                         <div style="font-size:2.5rem">🛍️</div>
                         <div>اختر منتجاً للبدء</div>
+                        <div class="muted" style="font-size:.8rem;margin-top:8px">اكتب رقم المنتج بالكيبورد ثم Enter</div>
                     </div>
                 }
+                @{ int rowIdx = 0; }
                 @foreach (var item in _cart)
                 {
-                    <div class="pos-cart-row">
+                    var isSel = rowIdx == _selectedRow;
+                    <div class="pos-cart-row @(isSel ? "selected-row" : "")" @onclick="() => SelectRow(item)">
                         <div class="pcr-info">
-                            <div class="pcr-name">@item.ProductName</div>
+                            <div class="pcr-name">
+                                @if (item.DisplayNumber > 0) { <span class="pcr-num">#@item.DisplayNumber</span> }
+                                @item.ProductName
+                            </div>
                             <div class="pcr-unit">@item.UnitPrice.ToString("N0") @_currency</div>
                         </div>
-                        <div class="pcr-qty">
+                        <div class="pcr-qty" @onclick:stopPropagation="true">
                             <button @onclick="() => ChangeQty(item, -1)">−</button>
                             <span>@item.Quantity</span>
                             <button @onclick="() => ChangeQty(item, +1)">+</button>
                         </div>
                         <div class="pcr-total">@item.LineTotal.ToString("N0")</div>
                     </div>
+                    rowIdx++;
                 }
             </div>
 
@@ -189,6 +167,58 @@
                 </div>
             }
         </div>
+
+        <div class="pos-left">
+            <div class="pos-search-bar">
+                <div class="pos-num-buffer @(string.IsNullOrEmpty(_numBuffer) ? "" : "active")" title="رقم المنتج">
+                    <span class="nb-label">رقم المنتج</span>
+                    <span class="nb-value">@(string.IsNullOrEmpty(_numBuffer) ? "—" : _numBuffer)</span>
+                    @if (!string.IsNullOrEmpty(_numBuffer))
+                    {
+                        <button class="nb-clear" @onclick="ClearNumBuffer" title="مسح">✕</button>
+                    }
+                </div>
+                <input class="pos-search-input" placeholder="🔍 بحث عن منتج..." @bind="_search" @bind:event="oninput" />
+                <input class="pos-barcode-input" id="barcode-input" placeholder="📱 باركود..." @bind="_barcode" @bind:event="oninput" @onkeyup="OnBarcodeKey" />
+            </div>
+
+            <div class="pos-categories">
+                <button class="cat-btn @(_category == "" ? "active" : "")" @onclick='() => _category = ""'>الكل</button>
+                @foreach (var cat in _categories)
+                {
+                    <button class="cat-btn @(_category == cat ? "active" : "")" @onclick="() => _category = cat">@cat</button>
+                }
+            </div>
+
+            <div class="pos-product-grid">
+                @foreach (var p in FilteredProducts)
+                {
+                    <button class="pos-product-btn @(p.Quantity <= 0 ? "out-of-stock" : "")"
+                            @onclick="() => AddItem(p)"
+                            disabled="@(p.Quantity <= 0)">
+                        @if (p.DisplayNumber > 0)
+                        {
+                            <div class="ppb-num-badge">@p.DisplayNumber</div>
+                        }
+                        <div class="ppb-emoji">@p.ImageEmoji</div>
+                        <div class="ppb-name">@p.Name</div>
+                        <div class="ppb-price">@p.Price.ToString("N0") @_currency</div>
+                        @if (!string.IsNullOrEmpty(p.Sku))
+                        {
+                            <div class="ppb-code">@p.Sku</div>
+                        }
+                        @if (p.Quantity <= 0) { <div class="ppb-out">نفذ</div> }
+                    </button>
+                }
+                @if (!FilteredProducts.Any())
+                {
+                    <div class="pos-empty-products">
+                        <div style="font-size:2.5rem">📭</div>
+                        <div>لا توجد منتجات تطابق البحث</div>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>
 
@@ -219,6 +249,10 @@
     private DateTime _now = DateTime.Now;
     private System.Threading.Timer? _timer;
 
+    private string _numBuffer = "";
+    private int _selectedRow = -1;
+    private DotNetObjectReference<Pos>? _selfRef;
+
     protected override async Task OnInitializedAsync()
     {
         var s = await SettingsSvc.GetAsync();
@@ -238,9 +272,30 @@
         _timer = new System.Threading.Timer(_ => InvokeAsync(() => { _now = DateTime.Now; StateHasChanged(); }), null, 0, 1000);
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _selfRef = DotNetObjectReference.Create(this);
+            try { await Js.InvokeVoidAsync("posKeyboard.attach", _selfRef); } catch { }
+        }
+    }
+
     private async Task Refresh()
     {
         _products = await InvSvc.GetProductsAsync();
+        // Auto-assign display numbers to products that don't have one yet, so cashier can use the keyboard right away
+        var needs = _products.Where(p => p.DisplayNumber <= 0).ToList();
+        if (needs.Any())
+        {
+            var max = _products.Max(p => p.DisplayNumber);
+            foreach (var p in needs)
+            {
+                p.DisplayNumber = ++max;
+                try { await InvSvc.SaveProductAsync(p); } catch { /* ignore — non-admin */ }
+            }
+            _products = await InvSvc.GetProductsAsync();
+        }
         _categories = _products.Select(p => p.Category).Distinct().Where(c => !string.IsNullOrEmpty(c)).OrderBy(c => c).ToList();
     }
 
@@ -253,7 +308,9 @@
     private IEnumerable<Product> FilteredProducts =>
         _products.Where(p =>
             (string.IsNullOrWhiteSpace(_category) || p.Category == _category) &&
-            (string.IsNullOrWhiteSpace(_search) || p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) || p.Sku.Contains(_search, StringComparison.OrdinalIgnoreCase)));
+            (string.IsNullOrWhiteSpace(_search) || p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) || p.Sku.Contains(_search, StringComparison.OrdinalIgnoreCase)))
+        .OrderBy(p => p.DisplayNumber == 0 ? int.MaxValue : p.DisplayNumber)
+        .ThenBy(p => p.Name);
 
     private async Task OnBarcodeKey(KeyboardEventArgs e)
     {
@@ -271,7 +328,16 @@
         _error = "";
         var existing = _cart.FirstOrDefault(c => c.ProductId == p.Id);
         if (existing != null) { existing.Quantity++; existing.LineTotal = existing.Quantity * existing.UnitPrice; }
-        else _cart.Add(new SaleInvoiceItem { ProductId = p.Id, ProductName = p.Name, UnitPrice = p.Price, Quantity = 1, LineTotal = p.Price });
+        else _cart.Add(new SaleInvoiceItem
+        {
+            ProductId = p.Id,
+            ProductName = p.Name,
+            DisplayNumber = p.DisplayNumber,
+            UnitPrice = p.Price,
+            Quantity = 1,
+            LineTotal = p.Price
+        });
+        _selectedRow = _cart.Count - 1;
     }
 
     private void ChangeQty(SaleInvoiceItem item, int delta)
@@ -279,6 +345,22 @@
         item.Quantity += delta;
         if (item.Quantity <= 0) _cart.Remove(item);
         else item.LineTotal = item.Quantity * item.UnitPrice;
+        if (_selectedRow >= _cart.Count) _selectedRow = _cart.Count - 1;
+    }
+
+    private void SelectRow(SaleInvoiceItem item)
+    {
+        var idx = _cart.IndexOf(item);
+        if (idx < 0) return;
+        if (_selectedRow == idx)
+        {
+            // tap on already-selected row = +1
+            ChangeQty(item, +1);
+        }
+        else
+        {
+            _selectedRow = idx;
+        }
     }
 
     private void ClearCart()
@@ -286,6 +368,102 @@
         _cart.Clear();
         _error = "";
         _lastInvoice = "";
+        _selectedRow = -1;
+    }
+
+    private void ClearNumBuffer() { _numBuffer = ""; }
+
+    // ============ JS-invokable keyboard handlers ============
+    [JSInvokable]
+    public Task OnDigit(string d)
+    {
+        if (_numBuffer.Length < 8) _numBuffer += d;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnEnter()
+    {
+        if (string.IsNullOrEmpty(_numBuffer))
+        {
+            // No buffer: Enter checks out
+            if (_cart.Any()) await Checkout();
+            return;
+        }
+        if (int.TryParse(_numBuffer, out var num))
+        {
+            var p = _products.FirstOrDefault(x => x.DisplayNumber == num);
+            if (p != null) AddItem(p);
+            else _error = $"❌ لا يوجد منتج برقم {num}";
+        }
+        _numBuffer = "";
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnBackspace()
+    {
+        if (_numBuffer.Length > 0) _numBuffer = _numBuffer.Substring(0, _numBuffer.Length - 1);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnEscape()
+    {
+        _numBuffer = "";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnArrow(string direction)
+    {
+        switch (direction)
+        {
+            case "right": // → confirm/print
+                if (_cart.Any()) await Checkout();
+                break;
+            case "left": // ← cancel current row
+                if (_selectedRow >= 0 && _selectedRow < _cart.Count)
+                {
+                    _cart.RemoveAt(_selectedRow);
+                    if (_selectedRow >= _cart.Count) _selectedRow = _cart.Count - 1;
+                    StateHasChanged();
+                }
+                break;
+            case "up":
+                if (_cart.Any()) { _selectedRow = Math.Max(0, _selectedRow - 1); StateHasChanged(); }
+                break;
+            case "down":
+                if (_cart.Any()) { _selectedRow = Math.Min(_cart.Count - 1, _selectedRow + 1); StateHasChanged(); }
+                break;
+        }
+    }
+
+    [JSInvokable]
+    public Task OnDelete()
+    {
+        ClearCart();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnPlus()
+    {
+        if (_selectedRow >= 0 && _selectedRow < _cart.Count) ChangeQty(_cart[_selectedRow], +1);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnMinus()
+    {
+        if (_selectedRow >= 0 && _selectedRow < _cart.Count) ChangeQty(_cart[_selectedRow], -1);
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private decimal Subtotal => _cart.Sum(i => i.LineTotal);
@@ -309,6 +487,7 @@
             {
                 ProductId = c.ProductId,
                 ProductName = c.ProductName,
+                DisplayNumber = c.DisplayNumber,
                 Quantity = c.Quantity,
                 UnitPrice = c.UnitPrice,
                 LineTotal = c.LineTotal,
@@ -321,6 +500,7 @@
             _lastInvoiceId = inv.Id;
             await Audit.LogAsync("بيع", "نقطة البيع", $"فاتورة {inv.InvoiceNumber} بقيمة {inv.Total:N2} — {_orderType}");
             _cart.Clear();
+            _selectedRow = -1;
             _paymentStatus = InvoicePaymentStatus.Paid;
             await Refresh();
             await UpdateOrderPreview();
@@ -346,5 +526,10 @@
         _showShiftModal = false;
     }
 
-    public void Dispose() => _timer?.Dispose();
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        try { await Js.InvokeVoidAsync("posKeyboard.detach"); } catch { }
+        _selfRef?.Dispose();
+    }
 }

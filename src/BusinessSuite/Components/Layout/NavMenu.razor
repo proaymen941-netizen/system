@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject NavigationManager Nav
+@inject AuthService Auth
 
 <aside class="sidebar">
     <div class="sidebar-brand">
@@ -47,11 +48,15 @@
         {
             new NavItem("/", "لوحة التحكم", "📊"),
         }),
-        new NavGroup("العمليات", new[]
+        new NavGroup("نقطة البيع والكاشير", new[]
         {
             new NavItem("/pos", "نقطة البيع", "🛒"),
-            new NavItem("/cashier-shifts", "الورديات", "⏱️"),
+            new NavItem("/cashier-shifts", "ورديات وإقفال الكاشير", "⏱️"),
             new NavItem("/sales", "المبيعات", "💵"),
+            new NavItem("/sales-returns", "مرتجع المبيعات", "↩️"),
+        }),
+        new NavGroup("المشتريات والعملاء", new[]
+        {
             new NavItem("/purchases", "المشتريات", "🧾"),
             new NavItem("/customers", "العملاء", "👤"),
         }),
@@ -59,26 +64,41 @@
         {
             new NavItem("/inventory", "المنتجات", "📦"),
             new NavItem("/stock-movements", "حركة المخزون", "🔄"),
+            new NavItem("/stock-issues", "سند صرف مخزني", "📤"),
             new NavItem("/import", "استيراد البيانات", "📥"),
         }),
         new NavGroup("المحاسبة", new[]
         {
+            new NavItem("/chart-of-accounts", "شجرة الحسابات", "🌳"),
+            new NavItem("/manual-journal", "إدخال القيود", "📝"),
             new NavItem("/accounting", "القيود اليومية", "💰"),
+            new NavItem("/vouchers/receipt", "سند قبض نقدي", "📥"),
+            new NavItem("/vouchers/payment", "سند صرف نقدي", "📤"),
+            new NavItem("/custodies", "العهد والأرصدة", "💼"),
+            new NavItem("/account-statements", "كشوف الحسابات", "📋"),
             new NavItem("/trial-balance", "ميزان المراجعة", "⚖️"),
         }),
         new NavGroup("الموارد البشرية", new[]
         {
-            new NavItem("/hr", "الموظفون", "👥"),
+            new NavItem("/hr", "بيانات الموظفين", "👥"),
+            new NavItem("/employee-statement", "كشف حساب الموظف", "🧾"),
+            new NavItem("/penalties-rewards", "الجزاءات والمكافآت", "⚖️"),
+            new NavItem("/monthly-absence", "الغياب الشهري", "📅"),
+            new NavItem("/installments", "الأقساط", "💳"),
             new NavItem("/attendance", "الحضور", "⏰"),
             new NavItem("/leaves", "الإجازات", "📋"),
         }),
-        new NavGroup("التحليلات", new[]
+        new NavGroup("الصيانة والتقارير", new[]
         {
+            new NavItem("/maintenance", "طلبات الصيانة", "🔧"),
+            new NavItem("/department-sales", "مبيعات حسب القسم", "🏷️"),
             new NavItem("/reports", "التقارير", "📈"),
         }),
-        new NavGroup("النظام", new[]
+        new NavGroup("النظام والتراخيص", new[]
         {
-            new NavItem("/users", "المستخدمون", "🔐"),
+            new NavItem("/license", "إدارة التراخيص", "🔐"),
+            new NavItem("/permissions", "الصلاحيات", "🛡️"),
+            new NavItem("/users", "المستخدمون", "👤"),
             new NavItem("/my-password", "كلمة المرور", "🔑"),
             new NavItem("/audit", "سجل العمليات", "📜"),
             new NavItem("/company-settings", "إعدادات الشركة", "🏢"),

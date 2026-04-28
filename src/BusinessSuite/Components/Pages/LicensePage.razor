@@ -1,0 +1,185 @@
+@page "/license"
+@rendermode InteractiveServer
+@inject LicenseService LicenseSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>إدارة التراخيص</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">إدارة التراخيص</h1>
+            <p class="page-subtitle">التحكم بمفتاح الترخيص وعدد الأجهزة المسموح لها بالعمل</p>
+        </div>
+    </div>
+
+    @if (!Auth.HasRole(UserRole.Admin))
+    {
+        <div class="error-banner">هذه الشاشة مخصصة لمدير النظام فقط.</div>
+    }
+    else if (_lic == null)
+    {
+        <p>جارٍ التحميل...</p>
+    }
+    else
+    {
+        <div class="stat-grid stat-grid-3">
+            <div class="stat-card stat-blue"><div class="stat-icon">🖥️</div><div class="stat-body"><div class="stat-label">أجهزة الإدارة</div><div class="stat-value">@_mgr / @_mgrMax</div></div></div>
+            <div class="stat-card stat-green"><div class="stat-icon">🛒</div><div class="stat-body"><div class="stat-label">أجهزة الكاشير</div><div class="stat-value">@_csh / @_cshMax</div></div></div>
+            <div class="stat-card stat-purple"><div class="stat-icon">💼</div><div class="stat-body"><div class="stat-label">أجهزة المحاسبة</div><div class="stat-value">@_acc / @_accMax</div></div></div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header"><h3>بيانات الترخيص</h3></div>
+            <EditForm Model="_lic" OnValidSubmit="SaveLicense">
+                <div class="form-grid">
+                    <label>اسم العميل<input class="input" @bind="_lic.CustomerName" /></label>
+                    <label>مفتاح الترخيص<input class="input" @bind="_lic.LicenseKey" dir="ltr" /></label>
+                    <label>عدد أجهزة الإدارة<input class="input" type="number" min="0" @bind="_lic.MaxManagerDevices" /></label>
+                    <label>عدد أجهزة الكاشير<input class="input" type="number" min="0" @bind="_lic.MaxCashierDevices" /></label>
+                    <label>عدد أجهزة المحاسبة<input class="input" type="number" min="0" @bind="_lic.MaxAccountantDevices" /></label>
+                    <label>تاريخ انتهاء الترخيص<input class="input" type="date" @bind="_lic.ExpiresAt" /></label>
+                    <label>جهة الإصدار<input class="input" @bind="_lic.IssuedBy" /></label>
+                    <label class="full">
+                        <input type="checkbox" @bind="_lic.IsActive" />
+                        الترخيص مفعل
+                    </label>
+                    <label class="full">ملاحظات<textarea class="input" rows="2" @bind="_lic.Notes"></textarea></label>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="primary-btn">حفظ بيانات الترخيص</button>
+                </div>
+            </EditForm>
+            @if (!string.IsNullOrEmpty(_msg))
+            {
+                <div class="@(_isErr ? "error-banner" : "success-banner")">@_msg</div>
+            }
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h3>الأجهزة المسجلة (@_devices.Count)</h3>
+                <button class="ghost-btn" @onclick="LoadDevices">🔄 تحديث</button>
+            </div>
+            <table class="table-soft striped">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>النوع</th>
+                        <th>البصمة</th>
+                        <th>IP</th>
+                        <th>التسجيل</th>
+                        <th>آخر ظهور</th>
+                        <th>الحالة</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!_devices.Any())
+                    {
+                        <tr><td colspan="8" class="empty">لا توجد أجهزة مسجلة بعد</td></tr>
+                    }
+                    @foreach (var d in _devices)
+                    {
+                        <tr>
+                            <td>@d.DeviceName</td>
+                            <td>@KindAr(d.Kind)</td>
+                            <td dir="ltr"><code>@d.DeviceFingerprint.Substring(0, Math.Min(d.DeviceFingerprint.Length, 12))…</code></td>
+                            <td dir="ltr">@d.IpAddress</td>
+                            <td>@d.RegisteredAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@d.LastSeenAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                @if (d.IsBlocked)
+                                {
+                                    <span class="text-orange">محظور</span>
+                                }
+                                else if (!d.IsActive)
+                                {
+                                    <span class="text-orange">معطل</span>
+                                }
+                                else
+                                {
+                                    <span class="text-green">نشط</span>
+                                }
+                            </td>
+                            <td>
+                                @if (d.IsActive && !d.IsBlocked)
+                                {
+                                    <button class="link" @onclick="() => Toggle(d, false, false)">تعطيل</button>
+                                    <button class="link danger" @onclick="() => Toggle(d, false, true)">حظر</button>
+                                }
+                                else
+                                {
+                                    <button class="link" @onclick="() => Toggle(d, true, false)">تفعيل</button>
+                                }
+                                <button class="link danger" @onclick="() => DeleteDevice(d.Id)">حذف</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="muted" style="margin-top:12px">
+                💡 عند تجاوز عدد الأجهزة المسموح به، سيتم منع أي جهاز جديد من تسجيل الدخول حتى تقوم بحذف جهاز قديم أو رفع الحد المسموح بالترخيص.
+            </p>
+        </div>
+    }
+</div>
+
+@code {
+    private LicenseInfo? _lic;
+    private List<RegisteredDevice> _devices = new();
+    private int _mgr, _mgrMax, _csh, _cshMax, _acc, _accMax;
+    private string _msg = "";
+    private bool _isErr;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _lic = await LicenseSvc.GetOrCreateAsync();
+        await LoadDevices();
+    }
+
+    private async Task LoadDevices()
+    {
+        _devices = await LicenseSvc.GetDevicesAsync();
+        var u = await LicenseSvc.GetUsageAsync();
+        _mgr = u.Mgr; _mgrMax = u.MgrMax; _csh = u.Csh; _cshMax = u.CshMax; _acc = u.Acc; _accMax = u.AccMax;
+    }
+
+    private async Task SaveLicense()
+    {
+        if (_lic == null) return;
+        try
+        {
+            await LicenseSvc.UpdateAsync(_lic);
+            await Audit.LogAsync("تحديث الترخيص", "النظام", $"الكاشير: {_lic.MaxCashierDevices} - الإدارة: {_lic.MaxManagerDevices}");
+            _msg = "تم حفظ بيانات الترخيص بنجاح."; _isErr = false;
+            await Reload();
+        }
+        catch (Exception ex) { _msg = ex.Message; _isErr = true; }
+    }
+
+    private async Task Toggle(RegisteredDevice d, bool active, bool blocked)
+    {
+        await LicenseSvc.SetDeviceStateAsync(d.Id, active, blocked);
+        await Audit.LogAsync(blocked ? "حظر جهاز" : (active ? "تفعيل جهاز" : "تعطيل جهاز"), "النظام", d.DeviceName);
+        await LoadDevices();
+    }
+
+    private async Task DeleteDevice(int id)
+    {
+        await LicenseSvc.DeleteDeviceAsync(id);
+        await Audit.LogAsync("حذف جهاز", "النظام", $"ID={id}");
+        await LoadDevices();
+    }
+
+    private static string KindAr(DeviceKind k) => k switch
+    {
+        DeviceKind.Manager => "إدارة",
+        DeviceKind.Cashier => "كاشير",
+        DeviceKind.Accountant => "محاسبة",
+        _ => "غير معروف"
+    };
+}

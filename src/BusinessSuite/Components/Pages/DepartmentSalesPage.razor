@@ -1,0 +1,58 @@
+@page "/department-sales"
+@rendermode InteractiveServer
+@inject OperationsExtendedService OpsSvc
+
+<PageTitle>المبيعات حسب القسم</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">المبيعات والصرف حسب القسم — تفصيلي</h1>
+            <p class="page-subtitle">تحليل المبيعات حسب فئة المنتج / القسم</p>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="form-grid">
+            <label>من تاريخ<input class="input" type="date" @bind="_from" /></label>
+            <label>إلى تاريخ<input class="input" type="date" @bind="_to" /></label>
+            <label>&nbsp;<button class="primary-btn" @onclick="Load">عرض التقرير</button></label>
+        </div>
+    </div>
+
+    @if (_rows.Any())
+    {
+        <div class="stat-grid stat-grid-3">
+            <div class="stat-card stat-blue"><div class="stat-icon">🏷️</div><div class="stat-body"><div class="stat-label">عدد الأقسام</div><div class="stat-value">@_rows.Count</div></div></div>
+            <div class="stat-card stat-purple"><div class="stat-icon">📦</div><div class="stat-body"><div class="stat-label">إجمالي القطع</div><div class="stat-value">@_rows.Sum(r => r.Quantity)</div></div></div>
+            <div class="stat-card stat-green"><div class="stat-icon">💰</div><div class="stat-body"><div class="stat-label">إجمالي المبيعات</div><div class="stat-value">@_rows.Sum(r => r.Total).ToString("N2")</div></div></div>
+        </div>
+
+        <div class="panel">
+            <table class="table-soft striped">
+                <thead><tr><th>القسم</th><th>الكمية المباعة</th><th>الإجمالي</th><th>النسبة</th></tr></thead>
+                <tbody>
+                    @{ var grand = _rows.Sum(r => r.Total); }
+                    @foreach (var r in _rows)
+                    {
+                        <tr>
+                            <td><strong>@r.Category</strong></td>
+                            <td>@r.Quantity</td>
+                            <td>@r.Total.ToString("N2")</td>
+                            <td>@(grand > 0 ? (r.Total / grand * 100).ToString("N1") + "%" : "0%")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private DateTime? _from = DateTime.Today.AddMonths(-1);
+    private DateTime? _to = DateTime.Today;
+    private List<OperationsExtendedService.DepartmentSalesRow> _rows = new();
+
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load() => _rows = await OpsSvc.GetDepartmentSalesAsync(_from, _to);
+}

@@ -1,0 +1,164 @@
+@page "/manual-journal"
+@rendermode InteractiveServer
+@inject AccountingExtendedService AccSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>إدخال القيود المحاسبية</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">إدخال القيود المحاسبية</h1>
+            <p class="page-subtitle">قيود مدين/دائن متوازنة تُسجّل يدوياً في دفتر اليومية</p>
+        </div>
+        <div class="page-header-actions">
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+            {
+                <button class="primary-btn" @onclick="StartNew">+ قيد يدوي جديد</button>
+            }
+        </div>
+    </div>
+
+    <div class="panel">
+        <table class="table-soft striped">
+            <thead><tr><th>الرقم</th><th>التاريخ</th><th>الوصف</th><th>المدين</th><th>الدائن</th><th>الحالة</th><th></th></tr></thead>
+            <tbody>
+                @if (!_list.Any()) { <tr><td colspan="7" class="empty">لا توجد قيود</td></tr> }
+                @foreach (var m in _list)
+                {
+                    <tr>
+                        <td><strong>@m.EntryNumber</strong></td>
+                        <td>@m.Date.ToString("yyyy-MM-dd")</td>
+                        <td>@m.Description</td>
+                        <td>@m.TotalDebit.ToString("N2")</td>
+                        <td>@m.TotalCredit.ToString("N2")</td>
+                        <td>@(m.IsPosted ? "مرحل" : "مسودة")</td>
+                        <td>
+                            @if (!m.IsPosted && Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+                            {
+                                <button class="link" @onclick="() => Post(m.Id)">ترحيل</button>
+                                <button class="link" @onclick="() => Edit(m)">تعديل</button>
+                                <button class="link danger" @onclick="() => Delete(m.Id)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="() => _editing = null">
+            <div class="modal" style="max-width:900px" @onclick:stopPropagation="true">
+                <h3>قيد يدوي</h3>
+                @if (!string.IsNullOrEmpty(_err)) { <div class="error-banner">@_err</div> }
+                <div class="form-grid">
+                    <label>التاريخ<input class="input" type="date" @bind="_editing.Date" /></label>
+                    <label class="full">الوصف<input class="input" @bind="_editing.Description" /></label>
+                </div>
+                <h4>السطور</h4>
+                <table class="table-soft">
+                    <thead><tr><th>الحساب</th><th>البيان</th><th>مدين</th><th>دائن</th><th></th></tr></thead>
+                    <tbody>
+                        @for (int i = 0; i < _editing.Lines.Count; i++)
+                        {
+                            var idx = i;
+                            var line = _editing.Lines[idx];
+                            <tr>
+                                <td>
+                                    <select class="input" @bind="line.AccountId">
+                                        <option value="0">— اختر حساباً —</option>
+                                        @foreach (var a in _accounts) { <option value="@a.Id">@a.Code - @a.Name</option> }
+                                    </select>
+                                </td>
+                                <td><input class="input" @bind="line.Description" /></td>
+                                <td><input class="input" type="number" step="0.01" @bind="line.Debit" /></td>
+                                <td><input class="input" type="number" step="0.01" @bind="line.Credit" /></td>
+                                <td><button class="link danger" @onclick="() => RemoveLine(idx)">حذف</button></td>
+                            </tr>
+                        }
+                        <tr>
+                            <td colspan="2"><strong>الإجمالي</strong></td>
+                            <td><strong>@_editing.TotalDebit.ToString("N2")</strong></td>
+                            <td><strong>@_editing.TotalCredit.ToString("N2")</strong></td>
+                            <td>
+                                <span class="@(_editing.TotalDebit == _editing.TotalCredit ? "text-green" : "text-orange")">
+                                    @(_editing.TotalDebit == _editing.TotalCredit ? "متوازن" : $"الفرق: {(_editing.TotalDebit - _editing.TotalCredit):N2}")
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button class="ghost-btn" @onclick="AddLine">+ سطر جديد</button>
+                <div class="modal-actions">
+                    <button class="ghost-btn" @onclick="() => _editing = null">إلغاء</button>
+                    <button class="primary-btn" @onclick="Save">حفظ</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ManualJournalEntry> _list = new();
+    private List<ChartOfAccount> _accounts = new();
+    private ManualJournalEntry? _editing;
+    private string _err = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _accounts = await AccSvc.GetAccountsAsync();
+        await Refresh();
+    }
+
+    private async Task Refresh() => _list = await AccSvc.GetManualJournalsAsync();
+
+    private void StartNew()
+    {
+        _editing = new ManualJournalEntry { Date = DateTime.Today };
+        _editing.Lines.Add(new ManualJournalLine());
+        _editing.Lines.Add(new ManualJournalLine());
+        _err = "";
+    }
+
+    private void Edit(ManualJournalEntry m)
+    {
+        _editing = new ManualJournalEntry
+        {
+            Id = m.Id, EntryNumber = m.EntryNumber, Date = m.Date, Description = m.Description,
+            Lines = m.Lines.Select(l => new ManualJournalLine { AccountId = l.AccountId, Description = l.Description, Debit = l.Debit, Credit = l.Credit }).ToList()
+        };
+        _err = "";
+    }
+
+    private void AddLine() => _editing?.Lines.Add(new ManualJournalLine());
+    private void RemoveLine(int i) { if (_editing != null && _editing.Lines.Count > 0) _editing.Lines.RemoveAt(i); }
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        try
+        {
+            await AccSvc.SaveManualJournalAsync(_editing);
+            await Audit.LogAsync("حفظ قيد يدوي", "المحاسبة", _editing.Description);
+            _editing = null;
+            await Refresh();
+        }
+        catch (Exception ex) { _err = ex.Message; }
+    }
+
+    private async Task Post(int id)
+    {
+        try
+        {
+            await AccSvc.PostManualJournalAsync(id);
+            await Audit.LogAsync("ترحيل قيد يدوي", "المحاسبة", $"ID={id}");
+            await Refresh();
+        }
+        catch (Exception ex) { _err = ex.Message; }
+    }
+
+    private async Task Delete(int id) { await AccSvc.DeleteManualJournalAsync(id); await Refresh(); }
+}

@@ -1,0 +1,168 @@
+@page "/stock-issues"
+@rendermode InteractiveServer
+@inject OperationsExtendedService OpsSvc
+@inject InventoryService InvSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>سندات الصرف المخزني</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">سندات الصرف المخزني</h1>
+            <p class="page-subtitle">صرف بضائع من المخزن لاستخدام داخلي أو تحويل أو عينات</p>
+        </div>
+        <div class="page-header-actions">
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+            {
+                <button class="primary-btn" @onclick="StartNew">+ سند صرف جديد</button>
+            }
+        </div>
+    </div>
+
+    <div class="stat-grid stat-grid-3">
+        <div class="stat-card stat-blue"><div class="stat-icon">📤</div><div class="stat-body"><div class="stat-label">إجمالي السندات</div><div class="stat-value">@_list.Count</div></div></div>
+        <div class="stat-card stat-green"><div class="stat-icon">✅</div><div class="stat-body"><div class="stat-label">مرحلة</div><div class="stat-value">@_list.Count(s => s.IsPosted)</div></div></div>
+        <div class="stat-card stat-purple"><div class="stat-icon">💰</div><div class="stat-body"><div class="stat-label">قيمة الصرف</div><div class="stat-value">@_list.Where(s => s.IsPosted).Sum(s => s.Items.Sum(i => i.LineTotal)).ToString("N2")</div></div></div>
+    </div>
+
+    <div class="panel">
+        <table class="table-soft striped">
+            <thead><tr><th>الرقم</th><th>التاريخ</th><th>السبب</th><th>القسم</th><th>المستلم</th><th>عدد الأصناف</th><th>القيمة</th><th>الحالة</th><th></th></tr></thead>
+            <tbody>
+                @if (!_list.Any()) { <tr><td colspan="9" class="empty">لا توجد سندات</td></tr> }
+                @foreach (var s in _list)
+                {
+                    <tr>
+                        <td><strong>@s.VoucherNumber</strong></td>
+                        <td>@s.Date.ToString("yyyy-MM-dd")</td>
+                        <td>@OperationsExtendedService.ReasonAr(s.Reason)</td>
+                        <td>@s.Department</td>
+                        <td>@s.ReceivedBy</td>
+                        <td>@s.Items.Count</td>
+                        <td><strong>@s.Items.Sum(i => i.LineTotal).ToString("N2")</strong></td>
+                        <td>@(s.IsPosted ? "مرحل" : "مسودة")</td>
+                        <td>
+                            @if (!s.IsPosted && Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+                            {
+                                <button class="link" @onclick="() => Post(s.Id)">ترحيل</button>
+                                <button class="link danger" @onclick="() => Delete(s.Id)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="() => _editing = null">
+            <div class="modal" style="max-width:900px" @onclick:stopPropagation="true">
+                <h3>سند صرف مخزني جديد</h3>
+                <div class="form-grid">
+                    <label>التاريخ<input class="input" type="date" @bind="_editing.Date" /></label>
+                    <label>السبب
+                        <select class="input" @bind="_editing.Reason">
+                            <option value="@StockIssueReason.InternalUse">استخدام داخلي</option>
+                            <option value="@StockIssueReason.Transfer">تحويل بين مخازن</option>
+                            <option value="@StockIssueReason.Damaged">تالف</option>
+                            <option value="@StockIssueReason.Sample">عينة</option>
+                            <option value="@StockIssueReason.Other">أخرى</option>
+                        </select>
+                    </label>
+                    <label>القسم<input class="input" @bind="_editing.Department" /></label>
+                    <label>المستلم<input class="input" @bind="_editing.ReceivedBy" /></label>
+                    <label class="full">ملاحظات<input class="input" @bind="_editing.Notes" /></label>
+                </div>
+
+                <h4>الأصناف</h4>
+                <table class="table-soft">
+                    <thead><tr><th>الصنف</th><th>الكمية</th><th>التكلفة</th><th>الإجمالي</th><th></th></tr></thead>
+                    <tbody>
+                        @for (int i = 0; i < _editing.Items.Count; i++)
+                        {
+                            var idx = i;
+                            var it = _editing.Items[idx];
+                            <tr>
+                                <td>
+                                    <select class="input" @bind="it.ProductId" @bind:after="() => OnProductChanged(idx)">
+                                        <option value="0">— اختر —</option>
+                                        @foreach (var p in _products) { <option value="@p.Id">@p.Name (متاح: @p.Quantity)</option> }
+                                    </select>
+                                </td>
+                                <td><input class="input" type="number" min="1" @bind="it.Quantity" @bind:after="() => UpdateLine(idx)" /></td>
+                                <td><input class="input" type="number" step="0.01" @bind="it.UnitCost" @bind:after="() => UpdateLine(idx)" /></td>
+                                <td><strong>@it.LineTotal.ToString("N2")</strong></td>
+                                <td><button class="link danger" @onclick="() => _editing.Items.RemoveAt(idx)">حذف</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <button class="ghost-btn" @onclick="() => _editing.Items.Add(new StockIssueItem { Quantity = 1 })">+ سطر جديد</button>
+
+                <div class="modal-actions">
+                    <button class="ghost-btn" @onclick="() => _editing = null">إلغاء</button>
+                    <button class="primary-btn" @onclick="Save">حفظ</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<StockIssueVoucher> _list = new();
+    private List<Product> _products = new();
+    private StockIssueVoucher? _editing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _products = await InvSvc.GetProductsAsync();
+        await Refresh();
+    }
+
+    private async Task Refresh() => _list = await OpsSvc.GetIssuesAsync();
+
+    private void StartNew()
+    {
+        _editing = new StockIssueVoucher { Date = DateTime.Today, Reason = StockIssueReason.InternalUse };
+        _editing.Items.Add(new StockIssueItem { Quantity = 1 });
+    }
+
+    private void OnProductChanged(int idx)
+    {
+        if (_editing == null) return;
+        var it = _editing.Items[idx];
+        var p = _products.FirstOrDefault(x => x.Id == it.ProductId);
+        if (p != null) { it.ProductName = p.Name; it.UnitCost = p.Cost; }
+        UpdateLine(idx);
+    }
+
+    private void UpdateLine(int idx)
+    {
+        if (_editing == null) return;
+        var it = _editing.Items[idx];
+        it.LineTotal = it.UnitCost * it.Quantity;
+    }
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        _editing.Items = _editing.Items.Where(i => i.ProductId > 0 && i.Quantity > 0).ToList();
+        if (!_editing.Items.Any()) return;
+        await OpsSvc.CreateIssueAsync(_editing);
+        await Audit.LogAsync("إنشاء سند صرف مخزني", "المخزون", $"{OperationsExtendedService.ReasonAr(_editing.Reason)} - {_editing.ReceivedBy}");
+        _editing = null;
+        await Refresh();
+    }
+
+    private async Task Post(int id)
+    {
+        await OpsSvc.PostIssueAsync(id);
+        await Audit.LogAsync("ترحيل سند صرف مخزني", "المخزون", $"ID={id}");
+        await Refresh();
+    }
+
+    private async Task Delete(int id) { await OpsSvc.DeleteIssueAsync(id); await Refresh(); }
+}

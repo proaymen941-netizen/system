@@ -1,0 +1,121 @@
+@page "/installments"
+@rendermode InteractiveServer
+@inject HrExtendedService HrExt
+@inject HrService HrSvc
+@inject AuthService Auth
+@inject AuditService Audit
+
+<PageTitle>الأقساط</PageTitle>
+
+<div class="page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">بيانات الأقساط</h1>
+            <p class="page-subtitle">أقساط السلف والمشتريات للموظفين</p>
+        </div>
+        <div class="page-header-actions">
+            @if (Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+            {
+                <button class="primary-btn" @onclick="StartNew">+ قسط جديد</button>
+            }
+        </div>
+    </div>
+
+    <div class="stat-grid stat-grid-3">
+        <div class="stat-card stat-blue"><div class="stat-icon">📋</div><div class="stat-body"><div class="stat-label">إجمالي الأقساط</div><div class="stat-value">@_list.Count</div></div></div>
+        <div class="stat-card stat-orange"><div class="stat-icon">⏳</div><div class="stat-body"><div class="stat-label">جارية</div><div class="stat-value">@_list.Count(i => !i.IsCompleted)</div></div></div>
+        <div class="stat-card stat-green"><div class="stat-icon">💰</div><div class="stat-body"><div class="stat-label">القيمة المتبقية</div><div class="stat-value">@_list.Where(i => !i.IsCompleted).Sum(i => (i.TotalMonths - i.PaidMonths) * i.MonthlyAmount).ToString("N2")</div></div></div>
+    </div>
+
+    <div class="panel">
+        <table class="table-soft striped">
+            <thead><tr><th>الموظف</th><th>تاريخ البداية</th><th>الإجمالي</th><th>القسط الشهري</th><th>الأقساط</th><th>الوصف</th><th>الحالة</th><th></th></tr></thead>
+            <tbody>
+                @if (!_list.Any()) { <tr><td colspan="8" class="empty">لا توجد أقساط</td></tr> }
+                @foreach (var i in _list)
+                {
+                    <tr>
+                        <td>@(i.Employee?.Name ?? "-")</td>
+                        <td>@i.StartDate.ToString("yyyy-MM-dd")</td>
+                        <td><strong>@i.TotalAmount.ToString("N2")</strong></td>
+                        <td>@i.MonthlyAmount.ToString("N2")</td>
+                        <td>@i.PaidMonths / @i.TotalMonths</td>
+                        <td>@i.Description</td>
+                        <td>@(i.IsCompleted ? "مكتمل" : "جارٍ")</td>
+                        <td>
+                            @if (!i.IsCompleted && Auth.HasRole(UserRole.Admin, UserRole.Accountant))
+                            {
+                                <button class="link" @onclick="() => Pay(i.Id)">تسديد قسط</button>
+                                <button class="link danger" @onclick="() => Delete(i.Id)">حذف</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_editing != null)
+    {
+        <div class="modal-overlay" @onclick="() => _editing = null">
+            <div class="modal" @onclick:stopPropagation="true">
+                <h3>قسط جديد</h3>
+                <EditForm Model="_editing" OnValidSubmit="Save">
+                    <div class="form-grid">
+                        <label>الموظف
+                            <select class="input" @bind="_editing.EmployeeId" required>
+                                <option value="0">— اختر —</option>
+                                @foreach (var e in _employees) { <option value="@e.Id">@e.Name</option> }
+                            </select>
+                        </label>
+                        <label>تاريخ البداية<input class="input" type="date" @bind="_editing.StartDate" /></label>
+                        <label>المبلغ الإجمالي<input class="input" type="number" step="0.01" @bind="_editing.TotalAmount" required /></label>
+                        <label>عدد الأقساط<input class="input" type="number" @bind="_editing.TotalMonths" required /></label>
+                        <label>القسط الشهري<input class="input" type="number" step="0.01" @bind="_editing.MonthlyAmount" required /></label>
+                        <label class="full">الوصف<textarea class="input" rows="2" @bind="_editing.Description"></textarea></label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="ghost-btn" @onclick="() => _editing = null">إلغاء</button>
+                        <button type="submit" class="primary-btn">حفظ</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<EmployeeInstallment> _list = new();
+    private List<Employee> _employees = new();
+    private EmployeeInstallment? _editing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _employees = await HrSvc.GetEmployeesAsync();
+        await Refresh();
+    }
+
+    private async Task Refresh() => _list = await HrExt.GetInstallmentsAsync();
+
+    private void StartNew() => _editing = new EmployeeInstallment { StartDate = DateTime.Today, TotalMonths = 12 };
+
+    private async Task Save()
+    {
+        if (_editing == null) return;
+        if (_editing.MonthlyAmount == 0 && _editing.TotalMonths > 0)
+            _editing.MonthlyAmount = Math.Round(_editing.TotalAmount / _editing.TotalMonths, 2);
+        await HrExt.SaveInstallmentAsync(_editing);
+        await Audit.LogAsync("حفظ قسط", "الموارد البشرية", $"موظف #{_editing.EmployeeId} - {_editing.TotalAmount:N2}");
+        _editing = null;
+        await Refresh();
+    }
+
+    private async Task Pay(int id)
+    {
+        await HrExt.RegisterInstallmentPaymentAsync(id);
+        await Audit.LogAsync("تسديد قسط", "الموارد البشرية", $"ID={id}");
+        await Refresh();
+    }
+
+    private async Task Delete(int id) { await HrExt.DeleteInstallmentAsync(id); await Refresh(); }
+}
