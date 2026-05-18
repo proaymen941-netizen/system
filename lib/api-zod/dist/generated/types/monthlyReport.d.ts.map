@@ -1,1 +1,0 @@
-{"version":3,"file":"monthlyReport.d.ts","sourceRoot":"","sources":["../../../src/generated/types/monthlyReport.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,oBAAoB,EAAE,MAAM,wBAAwB,CAAC;AAEnE,MAAM,WAAW,aAAa;IAC5B,IAAI,EAAE,MAAM,CAAC;IACb,KAAK,EAAE,MAAM,CAAC;IACd,aAAa,EAAE,MAAM,CAAC;IACtB,iBAAiB,EAAE,oBAAoB,EAAE,CAAC;CAC3C"}

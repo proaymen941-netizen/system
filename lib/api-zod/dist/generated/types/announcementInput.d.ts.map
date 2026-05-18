@@ -1,1 +1,0 @@
-{"version":3,"file":"announcementInput.d.ts","sourceRoot":"","sources":["../../../src/generated/types/announcementInput.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,KAAK,EAAE,yBAAyB,EAAE,MAAM,6BAA6B,CAAC;AAE7E,MAAM,WAAW,iBAAiB;IAChC,KAAK,EAAE,MAAM,CAAC;IACd,OAAO,EAAE,MAAM,CAAC;IAChB,QAAQ,CAAC,EAAE,yBAAyB,CAAC;CACtC"}
